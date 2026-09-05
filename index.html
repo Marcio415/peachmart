@@ -6,8 +6,8 @@
 <title>Peachmart</title>
 <style>
   :root{
-    --bg:#F6F1E6; --paper:#FCFAF4; --ink:#20291F; --ink-soft:#5B6355; --line:#E1D8C0;
-    --primary:#2F6B4F; --primary-dark:#234F3A; --gold:#D9A441; --danger:#B4432E;
+    --bg:#FFF3EE; --paper:#FFFFFF; --ink:#3D2430; --ink-soft:#8C6672; --line:#F5DED2;
+    --primary:#E8447B; --primary-dark:#B22F5E; --peach:#FF9A6C; --pink:#E8447B; --gold:#F2A65A; --danger:#C0392B;
     --dinheiro:#4C7A3A; --cartao:#3A5BA6; --pix:#00958D;
   }
   *{box-sizing:border-box;}
@@ -19,7 +19,10 @@
   .header{position:sticky;top:0;z-index:20;background:var(--paper);border-bottom:1px solid var(--line);}
   .header-inner{max-width:1100px;margin:0 auto;padding:14px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;}
   .brand{display:flex;align-items:center;gap:8px;}
-  .brand-icon{width:34px;height:34px;border-radius:8px;background:var(--primary);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+  .brand-icon{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg, var(--peach), var(--pink));display:flex;align-items:center;justify-content:center;flex-shrink:0;overflow:hidden;}
+  .brand-icon img{width:100%;height:100%;object-fit:cover;display:block;}
+  .logo-lg{width:64px;height:64px;border-radius:16px;overflow:hidden;margin:0 auto 16px;box-shadow:0 6px 18px rgba(232,68,123,.25);}
+  .logo-lg img{width:100%;height:100%;object-fit:cover;display:block;}
   .brand h1{font-size:17px;font-weight:600;margin:0;line-height:1;}
   .brand button.name-btn{background:none;border:none;display:flex;align-items:center;gap:6px;padding:0;color:var(--ink);}
   .name-input{font-size:17px;font-weight:600;background:transparent;border:none;border-bottom:1px solid var(--line);outline:none;padding:2px 2px;color:var(--ink);}
@@ -52,7 +55,7 @@
   .empty{padding:26px 10px;text-align:center;font-size:13px;color:var(--ink-soft);}
   .error-text{color:var(--danger);font-size:12px;margin-top:6px;}
   .flash{margin-top:6px;font-size:13px;display:flex;align-items:center;gap:6px;}
-
+ 
   /* Caixa */
   .catalog-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;}
   @media(max-width:640px){.catalog-grid{grid-template-columns:repeat(2,1fr);}}
@@ -75,7 +78,7 @@
   .pix-box img{border-radius:8px;}
   .finalize-btn{width:100%;color:#fff;border:none;border-radius:10px;padding:13px;font-size:14px;font-weight:700;margin-top:10px;}
   .success-banner{background:var(--primary);color:#fff;border-radius:10px;padding:11px 12px;margin-top:12px;font-size:13px;display:flex;align-items:center;gap:8px;}
-
+ 
   /* Relatório */
   .stat-card{border-radius:14px;padding:16px;}
   .stat-card .lbl{font-size:11px;font-weight:600;text-transform:uppercase;opacity:.85;}
@@ -87,21 +90,21 @@
   .sale-row{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-top:1px solid var(--line);gap:10px;}
   .sale-row:first-child{border-top:none;}
   .pay-chip{font-size:11px;font-weight:600;border-radius:99px;padding:3px 8px;display:inline-flex;align-items:center;gap:4px;}
-
+ 
   /* Produtos */
   .prod-row{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-top:1px solid var(--line);gap:12px;}
   .prod-row:first-child{border-top:none;}
   .icon-btn{background:none;border:none;padding:2px;display:inline-flex;}
-
+ 
   /* Pin gate */
   .pin-wrap{max-width:360px;margin:32px auto 0;text-align:center;}
   .pin-circle{width:44px;height:44px;border-radius:99px;background:var(--bg);display:flex;align-items:center;justify-content:center;margin:0 auto 12px;}
   .pin-input{width:100%;text-align:center;letter-spacing:.5em;font-size:18px;border:1px solid var(--line);background:var(--bg);border-radius:10px;padding:11px;outline:none;margin-bottom:8px;}
-
+ 
   /* Situação / Fechamento de caixa */
   .kv-row{display:flex;justify-content:space-between;font-size:13px;padding:2px 0;}
   .kv-row.total{font-weight:700;border-top:1px dashed var(--line);padding-top:8px;margin-top:4px;}
-
+ 
   @media print {
     body *{visibility:hidden;}
     #print-area, #print-area *{visibility:visible;}
@@ -112,8 +115,19 @@
 </head>
 <body>
 <div id="root" class="app"></div>
-
+ 
 <script>
+// ---------------------------------------------------------------------------
+// Logo do app (embutido em base64, para o arquivo funcionar sozinho)
+// ---------------------------------------------------------------------------
+const LOGO_SRC = 'data:image/jpeg;base64,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';
+(function() {
+  const link = document.createElement('link');
+  link.rel = 'icon';
+  link.href = LOGO_SRC;
+  document.head.appendChild(link);
+})();
+ 
 // ---------------------------------------------------------------------------
 // Utilitários
 // ---------------------------------------------------------------------------
@@ -122,7 +136,7 @@ const brl = (n) => (Number(n) || 0).toLocaleString('pt-BR', { style: 'currency',
 const todayStr = () => new Date().toDateString();
 const stripAccents = (s) => (s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 const escapeHtml = (str) => String(str ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-
+ 
 // ---------------------------------------------------------------------------
 // Payload Pix (BR Code / EMV) — mesmo formato dos QR Codes oficiais de
 // cobrança Pix, com CRC16 exigido pelo padrão do Banco Central.
@@ -151,7 +165,7 @@ function buildPixPayload({ key, name, city, amount }) {
   payload += '6304';
   return payload + crc16(payload);
 }
-
+ 
 // ---------------------------------------------------------------------------
 // Ícones (SVG inline, sem dependências externas)
 // ---------------------------------------------------------------------------
@@ -182,13 +196,13 @@ function icon(name, size = 16, color = 'currentColor') {
 function dotsIcon(size = 19, color = 'currentColor') {
   return `<svg width="${size}" height="${size}" viewBox="0 0 24 24"><circle cx="12" cy="5" r="2" fill="${color}"/><circle cx="12" cy="12" r="2" fill="${color}"/><circle cx="12" cy="19" r="2" fill="${color}"/></svg>`;
 }
-
+ 
 const PAY = {
   dinheiro: { label: 'Dinheiro', color: 'var(--dinheiro)', hex: '#4C7A3A', icon: 'banknote' },
   cartao: { label: 'Cartão', color: 'var(--cartao)', hex: '#3A5BA6', icon: 'card' },
   pix: { label: 'Pix', color: 'var(--pix)', hex: '#00958D', icon: 'qr' },
 };
-
+ 
 // ---------------------------------------------------------------------------
 // Estado
 // ---------------------------------------------------------------------------
@@ -228,9 +242,32 @@ const state = {
   userFormError: '',
   userSaved: false,
 };
-
+ 
 const root = document.getElementById('root');
-
+ 
+// ---------------------------------------------------------------------------
+// Camada de armazenamento: usa window.storage (disponível no preview do
+// Claude) quando existir; caso contrário (app aberto direto no navegador),
+// cai para localStorage, para funcionar sozinho no dia a dia da loja.
+// ---------------------------------------------------------------------------
+const hasClaudeStorage = typeof window.storage !== 'undefined' && window.storage && typeof window.storage.get === 'function';
+async function storageGet(key) {
+  if (hasClaudeStorage) {
+    try { return await window.storage.get(key, false); } catch (e) { return null; }
+  }
+  try {
+    const raw = localStorage.getItem('peachmart_' + key);
+    return raw !== null ? { value: raw } : null;
+  } catch (e) { return null; }
+}
+function storageSet(key, value) {
+  if (hasClaudeStorage) {
+    try { window.storage.set(key, value, false).catch(() => {}); } catch (e) {}
+    return;
+  }
+  try { localStorage.setItem('peachmart_' + key, value); } catch (e) {}
+}
+ 
 function render() {
   const active = document.activeElement;
   let focusId = null, selStart = null, selEnd = null;
@@ -248,37 +285,37 @@ function render() {
   }
 }
 function focusById(id) { const el = document.getElementById(id); if (el) el.focus(); }
-
+ 
 // ---------------------------------------------------------------------------
 // Persistência
 // ---------------------------------------------------------------------------
 async function loadData() {
-  try { const r = await window.storage.get('products', false); state.products = r ? JSON.parse(r.value) : []; } catch (e) { state.products = []; }
-  try { const r = await window.storage.get('sales', false); state.sales = r ? JSON.parse(r.value) : []; } catch (e) { state.sales = []; }
-  try { const r = await window.storage.get('withdrawals', false); state.withdrawals = r ? JSON.parse(r.value) : []; } catch (e) { state.withdrawals = []; }
-  try { const r = await window.storage.get('cash_closures', false); state.cashClosures = r ? JSON.parse(r.value) : []; } catch (e) { state.cashClosures = []; }
+  try { const r = await storageGet('products'); state.products = r ? JSON.parse(r.value) : []; } catch (e) { state.products = []; }
+  try { const r = await storageGet('sales'); state.sales = r ? JSON.parse(r.value) : []; } catch (e) { state.sales = []; }
+  try { const r = await storageGet('withdrawals'); state.withdrawals = r ? JSON.parse(r.value) : []; } catch (e) { state.withdrawals = []; }
+  try { const r = await storageGet('cash_closures'); state.cashClosures = r ? JSON.parse(r.value) : []; } catch (e) { state.cashClosures = []; }
   try {
-    const r = await window.storage.get('store_name', false);
+    const r = await storageGet('store_name');
     state.storeName = (r && r.value && r.value !== 'Meu Mercado') ? r.value : 'Peachmart';
   } catch (e) { state.storeName = 'Peachmart'; }
-  try { const r = await window.storage.get('pix_config', false); if (r) state.pixConfig = JSON.parse(r.value); } catch (e) {}
-  try { const r = await window.storage.get('users', false); state.users = r ? JSON.parse(r.value) : []; } catch (e) { state.users = []; }
+  try { const r = await storageGet('pix_config'); if (r) state.pixConfig = JSON.parse(r.value); } catch (e) {}
+  try { const r = await storageGet('users'); state.users = r ? JSON.parse(r.value) : []; } catch (e) { state.users = []; }
   state.loading = false;
   render();
 }
-function saveProducts(list) { state.products = list; window.storage.set('products', JSON.stringify(list), false).catch(() => {}); }
-function saveSales(list) { state.sales = list; window.storage.set('sales', JSON.stringify(list), false).catch(() => {}); }
-function saveWithdrawals(list) { state.withdrawals = list; window.storage.set('withdrawals', JSON.stringify(list), false).catch(() => {}); }
-function saveCashClosures(list) { state.cashClosures = list; window.storage.set('cash_closures', JSON.stringify(list), false).catch(() => {}); }
-function saveStoreName(name) { state.storeName = name; window.storage.set('store_name', name, false).catch(() => {}); }
-function savePixConfig(cfg) { state.pixConfig = cfg; window.storage.set('pix_config', JSON.stringify(cfg), false).catch(() => {}); }
-function saveUsers(list) { state.users = list; window.storage.set('users', JSON.stringify(list), false).catch(() => {}); }
-
+function saveProducts(list) { state.products = list; storageSet('products', JSON.stringify(list)); }
+function saveSales(list) { state.sales = list; storageSet('sales', JSON.stringify(list)); }
+function saveWithdrawals(list) { state.withdrawals = list; storageSet('withdrawals', JSON.stringify(list)); }
+function saveCashClosures(list) { state.cashClosures = list; storageSet('cash_closures', JSON.stringify(list)); }
+function saveStoreName(name) { state.storeName = name; storageSet('store_name', name); }
+function savePixConfig(cfg) { state.pixConfig = cfg; storageSet('pix_config', JSON.stringify(cfg)); }
+function saveUsers(list) { state.users = list; storageSet('users', JSON.stringify(list)); }
+ 
 // ---------------------------------------------------------------------------
 // Ações — Caixa
 // ---------------------------------------------------------------------------
 function computeTotal() { return state.cart.reduce((s, i) => s + i.price * i.qty, 0); }
-
+ 
 function addByBarcode(raw) {
   let input = (raw || '').trim();
   if (!input) return;
@@ -315,7 +352,7 @@ function changeQty(barcode, delta) {
   item.qty = Math.min(stock, Math.max(1, item.qty + delta));
 }
 function removeItem(barcode) { state.cart = state.cart.filter((i) => i.barcode !== barcode); }
-
+ 
 function computeCanFinalize() {
   const total = computeTotal();
   if (state.cart.length === 0 || !state.payment) return false;
@@ -355,7 +392,7 @@ function copyPixCode() {
     setTimeout(() => { state.copied = false; render(); }, 2000);
   });
 }
-
+ 
 // ---------------------------------------------------------------------------
 // Ações — Retirada de valores / Fechamento de caixa
 // ---------------------------------------------------------------------------
@@ -413,7 +450,7 @@ function submitCashClosure() {
   state.lastClosureResult = closure;
   render();
 }
-
+ 
 // ---------------------------------------------------------------------------
 // Ações — usuários / login
 // ---------------------------------------------------------------------------
@@ -451,7 +488,7 @@ function logout() {
   state.loginError = '';
   render();
 }
-
+ 
 // ---------------------------------------------------------------------------
 // Ações — Gestão de usuários (financeiro)
 // ---------------------------------------------------------------------------
@@ -463,7 +500,7 @@ function submitUserForm() {
   if (!name) { state.userFormError = 'Informe o nome.'; render(); return; }
   const dupName = state.users.find((u) => u.name.toLowerCase() === name.toLowerCase() && u.id !== state.editingUserId);
   if (dupName) { state.userFormError = 'Já existe um usuário com esse nome.'; render(); return; }
-
+ 
   if (state.editingUserId) {
     if (pass || pass2) {
       if (pass.length < 4) { state.userFormError = 'A senha deve ter pelo menos 4 caracteres.'; render(); return; }
@@ -489,7 +526,7 @@ function removeUserHandler(id) {
   saveUsers(state.users.filter((u) => u.id !== id));
   if (state.editingUserId === id) resetUserForm(); else render();
 }
-
+ 
 // ---------------------------------------------------------------------------
 // Ações — Produtos
 // ---------------------------------------------------------------------------
@@ -501,11 +538,11 @@ function submitProductForm() {
   const category = (document.getElementById('pf-category') || {}).value?.trim() || '';
   const price = parseFloat(priceRaw.replace(',', '.'));
   const stock = parseInt(stockRaw || '0', 10);
-
+ 
   if (!barcode || !name || isNaN(price) || price <= 0) { state.formError = 'Preencha código de barras, nome e um preço válido.'; render(); return; }
   const dup = state.products.find((p) => p.barcode === barcode && p.id !== state.editingProductId);
   if (dup) { state.formError = 'Já existe um produto com esse código de barras.'; render(); return; }
-
+ 
   if (state.editingProductId) {
     saveProducts(state.products.map((p) => p.id === state.editingProductId ? { ...p, barcode, name, price, stock: isNaN(stock) ? 0 : stock, category } : p));
   } else {
@@ -519,7 +556,7 @@ function removeProductHandler(id) {
   saveProducts(state.products.filter((p) => p.id !== id));
   if (state.editingProductId === id) resetProductForm(); else render();
 }
-
+ 
 // ---------------------------------------------------------------------------
 // Ações — Configurações
 // ---------------------------------------------------------------------------
@@ -531,7 +568,7 @@ function savePixConfigHandler() {
   state.configSaved = true; render();
   setTimeout(() => { state.configSaved = false; render(); }, 2200);
 }
-
+ 
 // ---------------------------------------------------------------------------
 // Templates
 // ---------------------------------------------------------------------------
@@ -550,7 +587,7 @@ function headerHTML() {
   const nameBlock = state.editingName
     ? `<input id="name-input" class="name-input" data-enter="saveName" value="${escapeHtml(state.storeName)}" />`
     : `<button class="name-btn" data-action="toggle-edit-name"><h1>${escapeHtml(state.storeName)}</h1>${icon('pencil', 12, 'var(--ink-soft)')}</button>`;
-
+ 
   const isAmbos = state.currentUser && state.currentUser.role === 'ambos';
   const areaSwitchBtn = isAmbos
     ? (state.area === 'caixa'
@@ -559,25 +596,25 @@ function headerHTML() {
     : '';
   const logoutBtn = `<button class="btn no-print" data-action="logout" style="border-color:transparent;background:none;">Sair</button>`;
   const kebabBtn = `<button class="menu-btn no-print" data-action="toggle-nav-menu" title="Menu">${dotsIcon(19)}</button>`;
-
+ 
   const rightBlock = `<div class="no-print" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
         ${kebabBtn}
         ${areaSwitchBtn}
         ${logoutBtn}
       </div>`;
-
+ 
   const barItems = state.area === 'caixa' ? caixaTabs : financeiroTabs;
   const barActionName = state.area === 'caixa' ? 'set-caixa-tab' : 'set-tab';
   const barActiveId = state.area === 'caixa' ? state.caixaTab : state.tab;
   const menuBar = state.navMenuOpen
     ? `<div class="menu-bar no-print">${barItems.map(t => `<button data-action="${barActionName}" data-tab="${t.id}" class="${barActiveId === t.id ? 'active' : ''}">${icon(t.icon, 14)} ${t.label}</button>`).join('')}</div>`
     : '';
-
+ 
   return `
   <header class="header no-print">
     <div class="header-inner">
       <div class="brand">
-        <div class="brand-icon">${icon('scan', 17, '#fff')}</div>
+        <div class="brand-icon"><img src="${LOGO_SRC}" alt="Peachmart" /></div>
         ${nameBlock}
         <span class="badge ${state.area}">${state.area === 'caixa' ? 'Caixa' : 'Financeiro'}${state.currentUser ? ' · ' + escapeHtml(state.currentUser.name) : ''}</span>
       </div>
@@ -586,7 +623,7 @@ function headerHTML() {
     ${menuBar}
   </header>`;
 }
-
+ 
 function caixaVendaHTML() {
   const total = computeTotal();
   const pixReady = !!(state.pixConfig && state.pixConfig.key);
@@ -594,7 +631,7 @@ function caixaVendaHTML() {
   const quick = search
     ? state.products.filter(p => p.name.toLowerCase().includes(search.toLowerCase()) || p.barcode.includes(search)).slice(0, 8)
     : state.products.slice(0, 8);
-
+ 
   const catalogHTML = state.products.length === 0
     ? `<p class="empty">Nenhum produto cadastrado ainda. Peça para o financeiro cadastrar os produtos.</p>`
     : quick.length === 0
@@ -605,7 +642,7 @@ function caixaVendaHTML() {
             <div class="pprice mono">${brl(p.price)}</div>
             <div class="pstock" style="color:${p.stock <= 5 ? 'var(--danger)' : 'var(--ink-soft)'}">${p.stock <= 0 ? 'sem estoque' : p.stock + ' em estoque'}</div>
           </button>`).join('')}</div>`;
-
+ 
   const cartHTML = state.cart.length === 0
     ? `<p class="empty">Carrinho vazio. Bipe ou digite o código de barras — é adicionado automaticamente ao apertar Enter.</p>`
     : state.cart.map((item, idx) => `
@@ -625,7 +662,7 @@ function caixaVendaHTML() {
           </div>
           ${idx < state.cart.length - 1 ? '<div class="dashed"></div>' : ''}
         </div>`).join('');
-
+ 
   let paymentExtra = '';
   if (state.payment === 'dinheiro') {
     const receivedNum = parseFloat((state.receivedStr || '0').replace(',', '.'));
@@ -653,9 +690,9 @@ function caixaVendaHTML() {
         </div>`;
     }
   }
-
+ 
   const canFinalize = computeCanFinalize();
-
+ 
   return `
   <div class="grid5">
     <div class="col3 stack">
@@ -668,7 +705,7 @@ function caixaVendaHTML() {
         <p style="font-size:12px;color:var(--ink-soft);margin:8px 0 0;">Para adicionar várias unidades de uma vez, digite a quantidade seguida de * e o código — por exemplo, 3*7891234567890. Ao apertar Enter (ou bipar), o item entra direto no carrinho.</p>
         ${state.notFound ? `<div class="error-text" style="display:flex;align-items:center;gap:6px;">${icon('alert', 14)} Código "${escapeHtml(state.notFound)}" não encontrado. Peça para o financeiro cadastrar esse produto.</div>` : ''}
       </div>
-
+ 
       <div class="card">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
           <h2 style="font-size:14px;font-weight:600;margin:0;">Catálogo rápido</h2>
@@ -680,7 +717,7 @@ function caixaVendaHTML() {
         ${catalogHTML}
       </div>
     </div>
-
+ 
     <div class="col2">
       <div class="card" style="position:sticky;top:96px;">
         <h2 style="font-size:14px;font-weight:600;margin:0 0 10px;display:flex;align-items:center;gap:6px;">${icon('cart', 15)} Venda atual</h2>
@@ -701,13 +738,13 @@ function caixaVendaHTML() {
     </div>
   </div>`;
 }
-
+ 
 function caixaHTML() {
   if (state.caixaTab === 'retirada') return caixaRetiradaHTML();
   if (state.caixaTab === 'fechar') return caixaFecharHTML();
   return caixaVendaHTML();
 }
-
+ 
 function periodWithdrawalsList() {
   const list = periodWithdrawals();
   if (list.length === 0) return `<p class="empty" style="margin-top:14px;">Nenhuma retirada registrada neste turno.</p>`;
@@ -722,7 +759,7 @@ function periodWithdrawalsList() {
     </div>`).join('')}
   </div>`;
 }
-
+ 
 function caixaRetiradaHTML() {
   return `
   <div style="max-width:440px;" class="card">
@@ -736,7 +773,7 @@ function caixaRetiradaHTML() {
     ${periodWithdrawalsList()}
   </div>`;
 }
-
+ 
 function caixaFecharHTML() {
   if (state.lastClosureResult) return closureResultHTML(state.lastClosureResult);
   const pt = periodTotals();
@@ -757,7 +794,7 @@ function caixaFecharHTML() {
     <button class="btn btn-primary" data-action="submit-cash-closure">Confirmar fechamento</button>
   </div>`;
 }
-
+ 
 function closureResultHTML(c) {
   const diffColor = c.difference === 0 ? 'var(--primary-dark)' : (c.difference > 0 ? 'var(--gold)' : 'var(--danger)');
   const diffLabel = c.difference === 0 ? 'Confere certinho' : (c.difference > 0 ? 'Sobra' : 'Falta');
@@ -782,7 +819,7 @@ function closureResultHTML(c) {
     </div>
   </div>`;
 }
-
+ 
 function caixaSituacaoHTML() {
   const pt = periodTotals();
   return `
@@ -801,11 +838,11 @@ function caixaSituacaoHTML() {
     <button class="btn no-print" style="margin-top:18px;" data-action="print-page">Imprimir</button>
   </div>`;
 }
-
+ 
 function roleSelectHTML() {
   return `
   <div style="max-width:400px;margin:64px auto 0;text-align:center;">
-    <div class="brand-icon" style="width:52px;height:52px;margin:0 auto 16px;">${icon('scan', 24, '#fff')}</div>
+    <div class="logo-lg"><img src="${LOGO_SRC}" alt="Peachmart" /></div>
     <h2 style="font-size:19px;font-weight:700;margin:0 0 6px;">${escapeHtml(state.storeName)}</h2>
     <p style="font-size:13px;color:var(--ink-soft);margin:0 0 22px;">Olá, ${escapeHtml(state.currentUser?.name || '')}! Onde você vai trabalhar agora?</p>
     <div class="stack">
@@ -815,11 +852,11 @@ function roleSelectHTML() {
     <button class="btn" style="margin-top:18px;border-color:transparent;background:none;" data-action="logout">Sair</button>
   </div>`;
 }
-
+ 
 function bootstrapHTML() {
   return `
   <div style="max-width:400px;margin:56px auto 0;text-align:center;">
-    <div class="brand-icon" style="width:52px;height:52px;margin:0 auto 16px;">${icon('scan', 24, '#fff')}</div>
+    <div class="logo-lg"><img src="${LOGO_SRC}" alt="Peachmart" /></div>
     <h2 style="font-size:19px;font-weight:700;margin:0 0 6px;">${escapeHtml(state.storeName)}</h2>
     <p style="font-size:13px;color:var(--ink-soft);margin:0 0 20px;">Vamos criar o primeiro usuário do sistema. Ele terá acesso ao Caixa e ao Financeiro.</p>
     <div class="card" style="text-align:left;">
@@ -831,11 +868,11 @@ function bootstrapHTML() {
     </div>
   </div>`;
 }
-
+ 
 function loginHTML() {
   return `
   <div style="max-width:380px;margin:56px auto 0;text-align:center;">
-    <div class="brand-icon" style="width:52px;height:52px;margin:0 auto 16px;">${icon('scan', 24, '#fff')}</div>
+    <div class="logo-lg"><img src="${LOGO_SRC}" alt="Peachmart" /></div>
     <h2 style="font-size:19px;font-weight:700;margin:0 0 6px;">${escapeHtml(state.storeName)}</h2>
     <p style="font-size:13px;color:var(--ink-soft);margin:0 0 20px;">Entre com seu usuário para continuar.</p>
     <div class="card" style="text-align:left;">
@@ -853,7 +890,7 @@ function loginHTML() {
     </div>
   </div>`;
 }
-
+ 
 function fieldHTML({ id, label, value = '', placeholder = '', mono = false, type = 'text', enter = null }) {
   return `
     <div class="field">
@@ -863,13 +900,13 @@ function fieldHTML({ id, label, value = '', placeholder = '', mono = false, type
       </div>
     </div>`;
 }
-
+ 
 function produtosHTML() {
   const editing = state.editingProductId ? state.products.find(p => p.id === state.editingProductId) : null;
   const search = state.produtosSearch;
   const filtered = state.products.filter(p => p.name.toLowerCase().includes(search.toLowerCase()) || p.barcode.includes(search));
   const lowStock = state.products.filter(p => p.stock <= 5);
-
+ 
   return `
   <div class="grid5">
     <div class="col2 stack">
@@ -888,14 +925,14 @@ function produtosHTML() {
           ${editing ? `<button class="btn" data-action="reset-product-form">${icon('x', 15)}</button>` : ''}
         </div>
       </div>
-
+ 
       ${lowStock.length > 0 ? `
         <div class="card">
           <h3 style="font-size:13px;font-weight:600;margin:0 0 8px;color:var(--danger);display:flex;align-items:center;gap:6px;">${icon('alert', 14)} Estoque baixo</h3>
           ${lowStock.map(p => `<div style="display:flex;justify-content:space-between;font-size:13px;padding:3px 0;"><span>${escapeHtml(p.name)}</span><span class="mono" style="color:var(--danger);">${p.stock} un.</span></div>`).join('')}
         </div>` : ''}
     </div>
-
+ 
     <div class="col3">
       <div class="card">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
@@ -926,18 +963,18 @@ function produtosHTML() {
     </div>
   </div>`;
 }
-
+ 
 function relatorioHTML() {
   const todaySales = state.sales.filter(s => new Date(s.datetime).toDateString() === todayStr());
   const totalToday = todaySales.reduce((s, v) => s + v.total, 0);
   const totalGeral = state.sales.reduce((s, v) => s + v.total, 0);
   const byMethodToday = { dinheiro: 0, cartao: 0, pix: 0 };
   todaySales.forEach(s => byMethodToday[s.payment] += s.total);
-
+ 
   const days = Array.from({ length: 7 }, (_, i) => { const d = new Date(); d.setDate(d.getDate() - (6 - i)); return d; });
   const dayTotals = days.map(d => ({ date: d, total: state.sales.filter(s => new Date(s.datetime).toDateString() === d.toDateString()).reduce((s, v) => s + v.total, 0) }));
   const maxDay = Math.max(1, ...dayTotals.map(d => d.total));
-
+ 
   return `
   <div class="stack">
     <div class="grid5">
@@ -966,7 +1003,7 @@ function relatorioHTML() {
         </div>
       </div>
     </div>
-
+ 
     <div class="card">
       <p style="font-size:11px;font-weight:600;text-transform:uppercase;color:var(--ink-soft);margin:0 0 16px;">Últimos 7 dias</p>
       <div class="bars">
@@ -981,7 +1018,7 @@ function relatorioHTML() {
         }).join('')}
       </div>
     </div>
-
+ 
     <div class="card">
       <p style="font-size:11px;font-weight:600;text-transform:uppercase;color:var(--ink-soft);margin:0 0 8px;">Histórico de vendas</p>
       ${state.sales.length === 0 ? `<p class="empty">Nenhuma venda registrada ainda.</p>` : state.sales.slice(0, 40).map(s => {
@@ -1000,7 +1037,7 @@ function relatorioHTML() {
     </div>
   </div>`;
 }
-
+ 
 function configHTML() {
   const cfg = state.pixConfig;
   const editingUser = state.editingUserId ? state.users.find(u => u.id === state.editingUserId) : null;
@@ -1017,11 +1054,11 @@ function configHTML() {
       <button class="btn btn-primary" data-action="save-pix-config">Salvar chave Pix</button>
       ${state.configSaved ? `<span class="flash" style="color:var(--primary-dark);">${icon('check', 13)} Salvo</span>` : ''}
     </div>
-
+ 
     <div class="card">
       <h2 style="font-size:14px;font-weight:600;margin:0 0 2px;display:flex;align-items:center;gap:6px;">${icon('key', 15, 'var(--primary-dark)')} Usuários</h2>
       <p style="font-size:12px;color:var(--ink-soft);margin:0 0 12px;">Cada pessoa tem seu próprio usuário e senha. O papel decide o que ela pode acessar.</p>
-
+ 
       ${state.users.length > 0 ? `<div style="margin-bottom:16px;">
         ${state.users.map(u => `
           <div class="prod-row">
@@ -1035,7 +1072,7 @@ function configHTML() {
             </div>
           </div>`).join('')}
       </div>` : ''}
-
+ 
       <h3 style="font-size:13px;font-weight:600;margin:0 0 8px;">${editingUser ? 'Editar usuário' : 'Novo usuário'}</h3>
       ${fieldHTML({ id: 'uf-name', label: 'Nome', value: editingUser?.name || '', placeholder: 'Nome da pessoa', enter: 'submitUserForm' })}
       <div class="field">
@@ -1059,7 +1096,7 @@ function configHTML() {
     </div>
   </div>`;
 }
-
+ 
 function buildHTML() {
   if (state.loading) {
     return `<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;"><div style="display:flex;align-items:center;gap:8px;font-size:14px;color:var(--ink-soft);">${icon('scan', 18)} Carregando o caixa…</div></div>`;
@@ -1084,7 +1121,7 @@ function buildHTML() {
   }
   return `${headerHTML()}<main>${mainContent}</main>`;
 }
-
+ 
 // ---------------------------------------------------------------------------
 // Eventos (delegação)
 // ---------------------------------------------------------------------------
@@ -1104,7 +1141,7 @@ const ENTER_ACTIONS = {
   submitLogin: () => submitLogin(),
   submitUserForm: () => submitUserForm(),
 };
-
+ 
 root.addEventListener('click', (e) => {
   const t = e.target.closest('[data-action]');
   if (!t) return;
@@ -1139,7 +1176,7 @@ root.addEventListener('click', (e) => {
   else if (action === 'conclude-closure') { state.lastClosureResult = null; state.caixaTab = 'venda'; render(); }
   else if (action === 'print-page') window.print();
 });
-
+ 
 root.addEventListener('keydown', (e) => {
   if (e.key === 'Enter' && e.target.dataset && e.target.dataset.enter) {
     e.preventDefault();
@@ -1147,7 +1184,7 @@ root.addEventListener('keydown', (e) => {
     if (fn) fn();
   }
 });
-
+ 
 root.addEventListener('input', (e) => {
   const id = e.target.id;
   if (id === 'barcode-input') { state.code = e.target.value; }
@@ -1155,7 +1192,7 @@ root.addEventListener('input', (e) => {
   else if (id === 'produtos-search') { state.produtosSearch = e.target.value; render(); }
   else if (id === 'received-input') { state.receivedStr = e.target.value; render(); }
 });
-
+ 
 root.addEventListener('blur', (e) => {
   if (e.target && e.target.id === 'name-input') {
     const val = e.target.value || '';
@@ -1164,7 +1201,7 @@ root.addEventListener('blur', (e) => {
     render();
   }
 }, true);
-
+ 
 // ---------------------------------------------------------------------------
 loadData();
 </script>
