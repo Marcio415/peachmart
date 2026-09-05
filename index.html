@@ -1,11 +1,832 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="pt-BR">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=>, initial-scale=1.0">
-    <title>Document</title>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Peachmart</title>
+<style>
+  :root{
+    --bg:#F6F1E6; --paper:#FCFAF4; --ink:#20291F; --ink-soft:#5B6355; --line:#E1D8C0;
+    --primary:#2F6B4F; --primary-dark:#234F3A; --gold:#D9A441; --danger:#B4432E;
+    --dinheiro:#4C7A3A; --cartao:#3A5BA6; --pix:#00958D;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--ink);}
+  .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;}
+  button{font-family:inherit;cursor:pointer;}
+  input{font-family:inherit;}
+  .app{min-height:100vh;}
+  .header{position:sticky;top:0;z-index:20;background:var(--paper);border-bottom:1px solid var(--line);}
+  .header-inner{max-width:1100px;margin:0 auto;padding:14px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;}
+  .brand{display:flex;align-items:center;gap:8px;}
+  .brand-icon{width:34px;height:34px;border-radius:8px;background:var(--primary);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+  .brand h1{font-size:17px;font-weight:600;margin:0;line-height:1;}
+  .brand button.name-btn{background:none;border:none;display:flex;align-items:center;gap:6px;padding:0;color:var(--ink);}
+  .name-input{font-size:17px;font-weight:600;background:transparent;border:none;border-bottom:1px solid var(--line);outline:none;padding:2px 2px;color:var(--ink);}
+  .badge{font-size:11px;font-weight:600;padding:2px 9px;border-radius:99px;margin-left:2px;}
+  .badge.caixa{background:var(--primary);color:#fff;}
+  .badge.financeiro{background:var(--gold);color:var(--ink);}
+  .btn{border-radius:10px;padding:8px 14px;font-size:13px;font-weight:500;border:1px solid var(--line);background:var(--paper);color:var(--ink-soft);display:inline-flex;align-items:center;gap:6px;}
+  .btn-primary{background:var(--primary);color:#fff;border-color:var(--primary);}
+  .btn-primary:disabled{background:var(--line);border-color:var(--line);cursor:not-allowed;}
+  .nav{display:inline-flex;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:4px;gap:2px;}
+  .nav button{background:none;border:none;padding:7px 12px;border-radius:7px;font-size:13px;font-weight:500;color:var(--ink-soft);display:flex;align-items:center;gap:6px;}
+  .nav button.active{background:var(--primary);color:#fff;}
+  main{max-width:1100px;margin:0 auto;padding:22px 20px 60px;}
+  .card{background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:16px;}
+  .grid5{display:grid;grid-template-columns:repeat(5,1fr);gap:22px;}
+  .col3{grid-column:span 3;}
+  .col2{grid-column:span 2;}
+  @media(max-width:860px){.grid5{grid-template-columns:1fr;}.col3,.col2{grid-column:span 1;}}
+  .stack{display:flex;flex-direction:column;gap:16px;}
+  label.field-label{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.03em;color:var(--ink-soft);display:block;margin-bottom:6px;}
+  .input-wrap{border:1px solid var(--line);background:var(--bg);border-radius:10px;padding:9px 12px;display:flex;align-items:center;gap:8px;}
+  .input-wrap input{border:none;background:transparent;outline:none;font-size:14px;flex:1;color:var(--ink);width:100%;}
+  .field{margin-bottom:12px;}
+  .row{display:flex;gap:12px;}
+  .row > *{flex:1;}
+  .empty{padding:26px 10px;text-align:center;font-size:13px;color:var(--ink-soft);}
+  .error-text{color:var(--danger);font-size:12px;margin-top:6px;}
+  .flash{margin-top:6px;font-size:13px;display:flex;align-items:center;gap:6px;}
+
+  /* Caixa */
+  .catalog-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;}
+  @media(max-width:640px){.catalog-grid{grid-template-columns:repeat(2,1fr);}}
+  .prod-btn{border:1px solid var(--line);background:var(--bg);border-radius:10px;padding:10px 12px;text-align:left;}
+  .prod-btn:disabled{opacity:.4;cursor:not-allowed;}
+  .prod-btn .pname{font-size:12px;font-weight:600;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+  .prod-btn .pprice{font-size:12px;margin-top:4px;color:var(--primary-dark);}
+  .prod-btn .pstock{font-size:10.5px;margin-top:2px;}
+  .cart-item{display:flex;align-items:center;justify-content:space-between;padding:9px 0;gap:8px;}
+  .cart-item .ci-name{font-size:13.5px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .cart-item .ci-unit{font-size:11.5px;color:var(--ink-soft);}
+  .qty-btn{width:24px;height:24px;border-radius:6px;border:1px solid var(--line);background:var(--paper);display:inline-flex;align-items:center;justify-content:center;}
+  .dashed{border-top:1px dashed var(--line);}
+  .cart-total{display:flex;align-items:center;justify-content:space-between;padding-top:12px;margin-top:6px;border-top:1px dashed var(--line);}
+  .cart-total .val{font-size:21px;font-weight:700;color:var(--primary-dark);}
+  .pay-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px;}
+  .pay-btn{border:1px solid var(--line);background:var(--paper);border-radius:10px;padding:10px 4px;display:flex;flex-direction:column;align-items:center;gap:4px;font-size:11.5px;font-weight:600;color:var(--ink);}
+  .pay-btn.active{color:#fff;}
+  .pix-box,.cash-box{border:1px solid var(--line);background:var(--bg);border-radius:10px;padding:12px;margin-top:10px;}
+  .pix-box img{border-radius:8px;}
+  .finalize-btn{width:100%;color:#fff;border:none;border-radius:10px;padding:13px;font-size:14px;font-weight:700;margin-top:10px;}
+  .success-banner{background:var(--primary);color:#fff;border-radius:10px;padding:11px 12px;margin-top:12px;font-size:13px;display:flex;align-items:center;gap:8px;}
+
+  /* Relatório */
+  .stat-card{border-radius:14px;padding:16px;}
+  .stat-card .lbl{font-size:11px;font-weight:600;text-transform:uppercase;opacity:.85;}
+  .stat-card .val{font-size:23px;font-weight:700;margin-top:4px;}
+  .stat-card .sub{font-size:12px;margin-top:4px;opacity:.75;}
+  .bars{display:flex;align-items:flex-end;gap:10px;height:130px;}
+  .bar-col{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;gap:6px;}
+  .bar{width:100%;border-radius:6px 6px 0 0;min-height:4px;}
+  .sale-row{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-top:1px solid var(--line);gap:10px;}
+  .sale-row:first-child{border-top:none;}
+  .pay-chip{font-size:11px;font-weight:600;border-radius:99px;padding:3px 8px;display:inline-flex;align-items:center;gap:4px;}
+
+  /* Produtos */
+  .prod-row{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-top:1px solid var(--line);gap:12px;}
+  .prod-row:first-child{border-top:none;}
+  .icon-btn{background:none;border:none;padding:2px;display:inline-flex;}
+
+  /* Pin gate */
+  .pin-wrap{max-width:360px;margin:32px auto 0;text-align:center;}
+  .pin-circle{width:44px;height:44px;border-radius:99px;background:var(--bg);display:flex;align-items:center;justify-content:center;margin:0 auto 12px;}
+  .pin-input{width:100%;text-align:center;letter-spacing:.5em;font-size:18px;border:1px solid var(--line);background:var(--bg);border-radius:10px;padding:11px;outline:none;margin-bottom:8px;}
+</style>
 </head>
 <body>
-    <p> aula</p>
+<div id="root" class="app"></div>
+
+<script>
+// ---------------------------------------------------------------------------
+// Utilitários
+// ---------------------------------------------------------------------------
+const uid = () => (crypto.randomUUID ? crypto.randomUUID() : 'id-' + Date.now() + '-' + Math.random().toString(16).slice(2));
+const brl = (n) => (Number(n) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+const todayStr = () => new Date().toDateString();
+const stripAccents = (s) => (s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+const escapeHtml = (str) => String(str ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+// ---------------------------------------------------------------------------
+// Payload Pix (BR Code / EMV) — mesmo formato dos QR Codes oficiais de
+// cobrança Pix, com CRC16 exigido pelo padrão do Banco Central.
+// ---------------------------------------------------------------------------
+function emv(id, value) {
+  const len = String(value.length).padStart(2, '0');
+  return `${id}${len}${value}`;
+}
+function crc16(payload) {
+  let crc = 0xffff;
+  const poly = 0x1021;
+  for (let i = 0; i < payload.length; i++) {
+    crc ^= payload.charCodeAt(i) << 8;
+    for (let j = 0; j < 8; j++) crc = (crc & 0x8000) !== 0 ? ((crc << 1) ^ poly) & 0xffff : (crc << 1) & 0xffff;
+  }
+  return crc.toString(16).toUpperCase().padStart(4, '0');
+}
+function buildPixPayload({ key, name, city, amount }) {
+  const merchantName = (stripAccents(name || 'RECEBEDOR').toUpperCase().slice(0, 25)) || 'RECEBEDOR';
+  const merchantCity = (stripAccents(city || 'BRASIL').toUpperCase().slice(0, 15)) || 'BRASIL';
+  const merchantInfo = emv('00', 'br.gov.bcb.pix') + emv('01', key.trim());
+  let payload =
+    emv('00', '01') + emv('01', '12') + emv('26', merchantInfo) + emv('52', '0000') + emv('53', '986') +
+    (amount > 0 ? emv('54', Number(amount).toFixed(2)) : '') + emv('58', 'BR') + emv('59', merchantName) +
+    emv('60', merchantCity) + emv('62', emv('05', '***'));
+  payload += '6304';
+  return payload + crc16(payload);
+}
+
+// ---------------------------------------------------------------------------
+// Ícones (SVG inline, sem dependências externas)
+// ---------------------------------------------------------------------------
+const ICONS = {
+  scan: '<path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><line x1="3" y1="12" x2="21" y2="12"/>',
+  cart: '<circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>',
+  package: '<path d="M21 8V21H3V8"/><path d="M1 3h22v5H1z"/><path d="M10 12h4"/>',
+  chart: '<path d="M3 3v18h18"/><rect x="7" y="12" width="3" height="6"/><rect x="12" y="8" width="3" height="10"/><rect x="17" y="4" width="3" height="14"/>',
+  settings: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>',
+  lock: '<rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
+  plus: '<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>',
+  minus: '<line x1="5" y1="12" x2="19" y2="12"/>',
+  trash: '<polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>',
+  check: '<polyline points="20 6 9 17 4 12"/>',
+  alert: '<path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>',
+  pencil: '<path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/>',
+  x: '<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>',
+  copy: '<rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>',
+  key: '<circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3L22 7l-3-3"/>',
+  search: '<circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>',
+  qr: '<rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><line x1="14" y1="14" x2="14" y2="21"/><line x1="21" y1="14" x2="21" y2="21"/><line x1="17.5" y1="17.5" x2="21" y2="17.5"/>',
+  banknote: '<rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/>',
+  card: '<rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/>',
+};
+function icon(name, size = 16, color = 'currentColor') {
+  return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICONS[name] || ''}</svg>`;
+}
+
+const PAY = {
+  dinheiro: { label: 'Dinheiro', color: 'var(--dinheiro)', hex: '#4C7A3A', icon: 'banknote' },
+  cartao: { label: 'Cartão', color: 'var(--cartao)', hex: '#3A5BA6', icon: 'card' },
+  pix: { label: 'Pix', color: 'var(--pix)', hex: '#00958D', icon: 'qr' },
+};
+
+// ---------------------------------------------------------------------------
+// Estado
+// ---------------------------------------------------------------------------
+const state = {
+  loading: true,
+  storeName: 'Peachmart',
+  editingName: false,
+  products: [],
+  sales: [],
+  pixConfig: { key: '', name: '', city: '' },
+  financeiroPin: null,
+  area: 'caixa',        // 'caixa' | 'financeiro'
+  unlocked: false,
+  tab: 'produtos',       // aba dentro do financeiro
+  cart: [],
+  code: '',
+  notFound: '',
+  payment: null,
+  receivedStr: '',
+  success: null,
+  copied: false,
+  catalogSearch: '',
+  produtosSearch: '',
+  editingProductId: null,
+  formError: '',
+  pinGateError: '',
+  configSaved: false,
+  pinChangeError: '',
+  pinSaved: false,
+};
+
+const root = document.getElementById('root');
+
+function render() {
+  const active = document.activeElement;
+  let focusId = null, selStart = null, selEnd = null;
+  if (active && active.id) {
+    focusId = active.id;
+    if (typeof active.selectionStart === 'number') { selStart = active.selectionStart; selEnd = active.selectionEnd; }
+  }
+  root.innerHTML = buildHTML();
+  if (focusId) {
+    const el = document.getElementById(focusId);
+    if (el) {
+      el.focus();
+      if (selStart != null && el.setSelectionRange) { try { el.setSelectionRange(selStart, selEnd); } catch (e) {} }
+    }
+  }
+}
+function focusById(id) { const el = document.getElementById(id); if (el) el.focus(); }
+
+// ---------------------------------------------------------------------------
+// Persistência
+// ---------------------------------------------------------------------------
+async function loadData() {
+  try { const r = await window.storage.get('products', false); state.products = r ? JSON.parse(r.value) : []; } catch (e) { state.products = []; }
+  try { const r = await window.storage.get('sales', false); state.sales = r ? JSON.parse(r.value) : []; } catch (e) { state.sales = []; }
+  try {
+    const r = await window.storage.get('store_name', false);
+    state.storeName = (r && r.value && r.value !== 'Meu Mercado') ? r.value : 'Peachmart';
+  } catch (e) { state.storeName = 'Peachmart'; }
+  try { const r = await window.storage.get('pix_config', false); if (r) state.pixConfig = JSON.parse(r.value); } catch (e) {}
+  try { const r = await window.storage.get('financeiro_pin', false); if (r) state.financeiroPin = r.value; } catch (e) { state.financeiroPin = null; }
+  state.loading = false;
+  render();
+}
+function saveProducts(list) { state.products = list; window.storage.set('products', JSON.stringify(list), false).catch(() => {}); }
+function saveSales(list) { state.sales = list; window.storage.set('sales', JSON.stringify(list), false).catch(() => {}); }
+function saveStoreName(name) { state.storeName = name; window.storage.set('store_name', name, false).catch(() => {}); }
+function savePixConfig(cfg) { state.pixConfig = cfg; window.storage.set('pix_config', JSON.stringify(cfg), false).catch(() => {}); }
+function savePin(pin) { state.financeiroPin = pin; window.storage.set('financeiro_pin', pin, false).catch(() => {}); }
+
+// ---------------------------------------------------------------------------
+// Ações — Caixa
+// ---------------------------------------------------------------------------
+function computeTotal() { return state.cart.reduce((s, i) => s + i.price * i.qty, 0); }
+
+function addByBarcode(raw) {
+  let input = (raw || '').trim();
+  if (!input) return;
+  let qty = 1;
+  if (input.includes('*')) {
+    const [qtyPart, ...rest] = input.split('*');
+    const parsedQty = parseInt(qtyPart.trim(), 10);
+    const barcodePart = rest.join('*').trim();
+    if (parsedQty > 0 && barcodePart) { qty = parsedQty; input = barcodePart; }
+  }
+  const barcode = input.trim();
+  const product = state.products.find((p) => p.barcode === barcode);
+  if (!product) { state.notFound = barcode; state.code = ''; render(); focusById('barcode-input'); return; }
+  state.notFound = '';
+  addToCart(product, qty);
+  state.code = '';
+  render();
+  focusById('barcode-input');
+}
+function addToCart(product, qtyToAdd = 1) {
+  if (!product) return;
+  const existing = state.cart.find((i) => i.barcode === product.barcode);
+  const currentQty = existing ? existing.qty : 0;
+  const newQty = Math.min(product.stock, currentQty + qtyToAdd);
+  if (newQty <= currentQty) return;
+  if (existing) existing.qty = newQty;
+  else state.cart.push({ barcode: product.barcode, name: product.name, price: product.price, qty: newQty });
+}
+function changeQty(barcode, delta) {
+  const item = state.cart.find((i) => i.barcode === barcode);
+  if (!item) return;
+  const product = state.products.find((p) => p.barcode === barcode);
+  const stock = product ? product.stock : 999;
+  item.qty = Math.min(stock, Math.max(1, item.qty + delta));
+}
+function removeItem(barcode) { state.cart = state.cart.filter((i) => i.barcode !== barcode); }
+
+function computeCanFinalize() {
+  const total = computeTotal();
+  if (state.cart.length === 0 || !state.payment) return false;
+  if (state.payment === 'dinheiro') {
+    const receivedNum = parseFloat((state.receivedStr || '0').replace(',', '.'));
+    return receivedNum > 0 && receivedNum >= total;
+  }
+  if (state.payment === 'pix') return !!(state.pixConfig && state.pixConfig.key);
+  return true;
+}
+function finalizeSale() {
+  if (!computeCanFinalize()) return;
+  const total = computeTotal();
+  const receivedNum = state.payment === 'dinheiro' ? parseFloat((state.receivedStr || '0').replace(',', '.')) : undefined;
+  const troco = state.payment === 'dinheiro' ? receivedNum - total : undefined;
+  const sale = { id: uid(), datetime: new Date().toISOString(), items: state.cart.map((i) => ({ ...i })), total, payment: state.payment, received: receivedNum, troco };
+  saveSales([sale, ...state.sales]);
+  const next = state.products.map((p) => {
+    const item = state.cart.find((i) => i.barcode === p.barcode);
+    return item ? { ...p, stock: Math.max(0, p.stock - item.qty) } : p;
+  });
+  saveProducts(next);
+  state.success = sale;
+  state.cart = [];
+  state.payment = null;
+  state.receivedStr = '';
+  render();
+  focusById('barcode-input');
+  setTimeout(() => { if (state.success && state.success.id === sale.id) { state.success = null; render(); } }, 3500);
+}
+function copyPixCode() {
+  const total = computeTotal();
+  if (!state.pixConfig || !state.pixConfig.key || total <= 0) return;
+  const payload = buildPixPayload({ key: state.pixConfig.key, name: state.pixConfig.name, city: state.pixConfig.city, amount: total });
+  navigator.clipboard?.writeText(payload).then(() => {
+    state.copied = true; render();
+    setTimeout(() => { state.copied = false; render(); }, 2000);
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Ações — navegação / financeiro
+// ---------------------------------------------------------------------------
+function enterFinanceiro() { state.area = 'financeiro'; state.tab = 'produtos'; render(); }
+function exitFinanceiro() { state.area = 'caixa'; state.unlocked = false; state.pinGateError = ''; render(); focusById('barcode-input'); }
+
+function pinSubmit() {
+  const pinVal = (document.getElementById('pin-input') || {}).value || '';
+  if (!state.financeiroPin) {
+    const confirmVal = (document.getElementById('pin-confirm-input') || {}).value || '';
+    if (pinVal.length < 4) { state.pinGateError = 'O PIN deve ter pelo menos 4 dígitos.'; render(); return; }
+    if (pinVal !== confirmVal) { state.pinGateError = 'Os PINs digitados não coincidem.'; render(); return; }
+    savePin(pinVal);
+    state.unlocked = true; state.pinGateError = ''; render();
+  } else {
+    if (pinVal === state.financeiroPin) { state.unlocked = true; state.pinGateError = ''; render(); }
+    else { state.pinGateError = 'PIN incorreto.'; render(); focusById('pin-input'); }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Ações — Produtos
+// ---------------------------------------------------------------------------
+function submitProductForm() {
+  const barcode = (document.getElementById('pf-barcode') || {}).value?.trim() || '';
+  const name = (document.getElementById('pf-name') || {}).value?.trim() || '';
+  const priceRaw = (document.getElementById('pf-price') || {}).value || '';
+  const stockRaw = (document.getElementById('pf-stock') || {}).value || '';
+  const category = (document.getElementById('pf-category') || {}).value?.trim() || '';
+  const price = parseFloat(priceRaw.replace(',', '.'));
+  const stock = parseInt(stockRaw || '0', 10);
+
+  if (!barcode || !name || isNaN(price) || price <= 0) { state.formError = 'Preencha código de barras, nome e um preço válido.'; render(); return; }
+  const dup = state.products.find((p) => p.barcode === barcode && p.id !== state.editingProductId);
+  if (dup) { state.formError = 'Já existe um produto com esse código de barras.'; render(); return; }
+
+  if (state.editingProductId) {
+    saveProducts(state.products.map((p) => p.id === state.editingProductId ? { ...p, barcode, name, price, stock: isNaN(stock) ? 0 : stock, category } : p));
+  } else {
+    saveProducts([...state.products, { id: uid(), barcode, name, price, stock: isNaN(stock) ? 0 : stock, category }]);
+  }
+  resetProductForm();
+}
+function resetProductForm() { state.editingProductId = null; state.formError = ''; render(); }
+function editProduct(id) { state.editingProductId = id; state.formError = ''; render(); focusById('pf-barcode'); }
+function removeProductHandler(id) {
+  saveProducts(state.products.filter((p) => p.id !== id));
+  if (state.editingProductId === id) resetProductForm(); else render();
+}
+
+// ---------------------------------------------------------------------------
+// Ações — Configurações
+// ---------------------------------------------------------------------------
+function savePixConfigHandler() {
+  const key = (document.getElementById('cfg-key') || {}).value || '';
+  const name = (document.getElementById('cfg-name') || {}).value || '';
+  const city = (document.getElementById('cfg-city') || {}).value || '';
+  savePixConfig({ key: key.trim(), name: name.trim(), city: city.trim() });
+  state.configSaved = true; render();
+  setTimeout(() => { state.configSaved = false; render(); }, 2200);
+}
+function changePinHandler() {
+  const oldPin = (document.getElementById('pin-old') || {}).value || '';
+  const newPin = (document.getElementById('pin-new') || {}).value || '';
+  const newPin2 = (document.getElementById('pin-new2') || {}).value || '';
+  if (oldPin !== state.financeiroPin) { state.pinChangeError = 'PIN atual incorreto.'; render(); return; }
+  if (newPin.length < 4) { state.pinChangeError = 'O novo PIN deve ter pelo menos 4 dígitos.'; render(); return; }
+  if (newPin !== newPin2) { state.pinChangeError = 'Os PINs digitados não coincidem.'; render(); return; }
+  savePin(newPin);
+  state.pinChangeError = ''; state.pinSaved = true; render();
+  setTimeout(() => { state.pinSaved = false; render(); }, 2200);
+}
+
+// ---------------------------------------------------------------------------
+// Templates
+// ---------------------------------------------------------------------------
+function headerHTML() {
+  const financeiroTabs = [
+    { id: 'produtos', label: 'Produtos', icon: 'package' },
+    { id: 'relatorio', label: 'Relatório', icon: 'chart' },
+    { id: 'config', label: 'Configurações', icon: 'settings' },
+  ];
+  const nameBlock = state.editingName
+    ? `<input id="name-input" class="name-input" data-enter="saveName" value="${escapeHtml(state.storeName)}" />`
+    : `<button class="name-btn" data-action="toggle-edit-name"><h1>${escapeHtml(state.storeName)}</h1>${icon('pencil', 12, 'var(--ink-soft)')}</button>`;
+
+  const rightBlock = state.area === 'caixa'
+    ? `<button class="btn" data-action="enter-financeiro">${icon('lock', 13)} Área financeira</button>`
+    : `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+        ${state.unlocked ? `<nav class="nav">${financeiroTabs.map(t => `<button data-action="set-tab" data-tab="${t.id}" class="${state.tab === t.id ? 'active' : ''}">${icon(t.icon, 14)} ${t.label}</button>`).join('')}</nav>` : ''}
+        <button class="btn" data-action="exit-financeiro">${icon('cart', 13)} Voltar ao caixa</button>
+      </div>`;
+
+  return `
+  <header class="header">
+    <div class="header-inner">
+      <div class="brand">
+        <div class="brand-icon">${icon('scan', 17, '#fff')}</div>
+        ${nameBlock}
+        <span class="badge ${state.area}">${state.area === 'caixa' ? 'Caixa' : 'Financeiro'}</span>
+      </div>
+      ${rightBlock}
+    </div>
+  </header>`;
+}
+
+function caixaHTML() {
+  const total = computeTotal();
+  const pixReady = !!(state.pixConfig && state.pixConfig.key);
+  const search = state.catalogSearch;
+  const quick = search
+    ? state.products.filter(p => p.name.toLowerCase().includes(search.toLowerCase()) || p.barcode.includes(search)).slice(0, 8)
+    : state.products.slice(0, 8);
+
+  const catalogHTML = state.products.length === 0
+    ? `<p class="empty">Nenhum produto cadastrado ainda. Peça para o financeiro cadastrar os produtos.</p>`
+    : quick.length === 0
+      ? `<p class="empty">Nada encontrado para "${escapeHtml(search)}".</p>`
+      : `<div class="catalog-grid">${quick.map(p => `
+          <button class="prod-btn" data-action="add-to-cart" data-barcode="${escapeHtml(p.barcode)}" ${p.stock <= 0 ? 'disabled' : ''}>
+            <div class="pname">${escapeHtml(p.name)}</div>
+            <div class="pprice mono">${brl(p.price)}</div>
+            <div class="pstock" style="color:${p.stock <= 5 ? 'var(--danger)' : 'var(--ink-soft)'}">${p.stock <= 0 ? 'sem estoque' : p.stock + ' em estoque'}</div>
+          </button>`).join('')}</div>`;
+
+  const cartHTML = state.cart.length === 0
+    ? `<p class="empty">Carrinho vazio. Bipe ou digite o código de barras — é adicionado automaticamente ao apertar Enter.</p>`
+    : state.cart.map((item, idx) => `
+        <div>
+          <div class="cart-item">
+            <div style="min-width:0;">
+              <div class="ci-name">${escapeHtml(item.name)}</div>
+              <div class="ci-unit mono">${brl(item.price)} un.</div>
+            </div>
+            <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
+              <button class="qty-btn" data-action="change-qty" data-barcode="${escapeHtml(item.barcode)}" data-delta="-1">${icon('minus', 11)}</button>
+              <span class="mono" style="width:20px;text-align:center;font-size:13px;">${item.qty}</span>
+              <button class="qty-btn" data-action="change-qty" data-barcode="${escapeHtml(item.barcode)}" data-delta="1">${icon('plus', 11)}</button>
+              <span class="mono" style="width:64px;text-align:right;font-size:13px;">${brl(item.price * item.qty)}</span>
+              <button class="icon-btn" data-action="remove-item" data-barcode="${escapeHtml(item.barcode)}" style="color:var(--danger);">${icon('trash', 14)}</button>
+            </div>
+          </div>
+          ${idx < state.cart.length - 1 ? '<div class="dashed"></div>' : ''}
+        </div>`).join('');
+
+  let paymentExtra = '';
+  if (state.payment === 'dinheiro') {
+    const receivedNum = parseFloat((state.receivedStr || '0').replace(',', '.'));
+    const troco = receivedNum - total;
+    paymentExtra = `
+      <div class="cash-box">
+        <label class="field-label">Valor recebido</label>
+        <input id="received-input" class="mono" style="width:100%;background:transparent;border:none;border-bottom:1px solid var(--line);outline:none;font-size:17px;padding-bottom:4px;" placeholder="0,00" value="${escapeHtml(state.receivedStr)}" />
+        ${state.receivedStr ? `<div style="display:flex;justify-content:space-between;font-size:13px;margin-top:8px;">
+          <span style="color:var(--ink-soft);">Troco</span>
+          <span class="mono" style="font-weight:600;color:${troco >= 0 ? 'var(--primary-dark)' : 'var(--danger)'}">${troco >= 0 ? brl(troco) : 'valor insuficiente'}</span>
+        </div>` : ''}
+      </div>`;
+  } else if (state.payment === 'pix') {
+    if (!pixReady) {
+      paymentExtra = `<div class="cash-box" style="color:var(--danger);display:flex;gap:8px;align-items:flex-start;">${icon('alert', 15)}<span>Chave Pix não cadastrada. Peça para o financeiro configurar em "Configurações".</span></div>`;
+    } else {
+      const payload = buildPixPayload({ key: state.pixConfig.key, name: state.pixConfig.name, city: state.pixConfig.city, amount: total });
+      const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=8&data=${encodeURIComponent(payload)}`;
+      paymentExtra = `
+        <div class="pix-box" style="display:flex;flex-direction:column;align-items:center;gap:8px;">
+          <img src="${qrUrl}" alt="QR Code Pix" width="180" height="180" />
+          <p style="font-size:12px;text-align:center;color:var(--ink-soft);margin:0;">Peça para o cliente escanear o QR Code no app do banco.</p>
+          <button class="btn" style="width:100%;justify-content:center;" data-action="copy-pix">${icon(state.copied ? 'check' : 'copy', 13)} ${state.copied ? 'Código copiado!' : 'Copiar código Pix'}</button>
+        </div>`;
+    }
+  }
+
+  const canFinalize = computeCanFinalize();
+
+  return `
+  <div class="grid5">
+    <div class="col3 stack">
+      <div class="card">
+        <label class="field-label">Código de barras</label>
+        <div class="input-wrap" style="margin-top:8px;">
+          ${icon('scan', 17, 'var(--primary)')}
+          <input id="barcode-input" data-enter="addByBarcode" value="${escapeHtml(state.code)}" placeholder="Bipe o código, ou digite 3*código para 3 unidades" autocomplete="off" />
+        </div>
+        <p style="font-size:12px;color:var(--ink-soft);margin:8px 0 0;">Para adicionar várias unidades de uma vez, digite a quantidade seguida de * e o código — por exemplo, 3*7891234567890. Ao apertar Enter (ou bipar), o item entra direto no carrinho.</p>
+        ${state.notFound ? `<div class="error-text" style="display:flex;align-items:center;gap:6px;">${icon('alert', 14)} Código "${escapeHtml(state.notFound)}" não encontrado. Peça para o financeiro cadastrar esse produto.</div>` : ''}
+      </div>
+
+      <div class="card">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+          <h2 style="font-size:14px;font-weight:600;margin:0;">Catálogo rápido</h2>
+          <div class="input-wrap" style="padding:6px 10px;">
+            ${icon('search', 13, 'var(--ink-soft)')}
+            <input id="catalog-search" style="width:120px;font-size:12px;" placeholder="Buscar produto" value="${escapeHtml(state.catalogSearch)}" />
+          </div>
+        </div>
+        ${catalogHTML}
+      </div>
+    </div>
+
+    <div class="col2">
+      <div class="card" style="position:sticky;top:96px;">
+        <h2 style="font-size:14px;font-weight:600;margin:0 0 10px;display:flex;align-items:center;gap:6px;">${icon('cart', 15)} Venda atual</h2>
+        ${cartHTML}
+        <div class="cart-total"><span style="font-size:14px;font-weight:500;">Total</span><span class="val mono">${brl(total)}</span></div>
+        ${state.cart.length > 0 ? `
+          <div class="pay-grid">
+            ${Object.entries(PAY).map(([key, p]) => `
+              <button class="pay-btn ${state.payment === key ? 'active' : ''}" style="${state.payment === key ? `background:${p.hex};border-color:${p.hex};` : ''}" data-action="set-payment" data-payment="${key}">
+                ${icon(p.icon, 16)} ${p.label}
+              </button>`).join('')}
+          </div>
+          ${paymentExtra}
+          <button class="finalize-btn" data-action="finalize-sale" ${canFinalize ? '' : 'disabled'} style="background:${canFinalize ? 'var(--primary)' : 'var(--line)'};cursor:${canFinalize ? 'pointer' : 'not-allowed'};">Finalizar venda</button>
+        ` : ''}
+        ${state.success ? `<div class="success-banner">${icon('check', 15)} Venda de ${brl(state.success.total)} registrada em ${PAY[state.success.payment].label}.</div>` : ''}
+      </div>
+    </div>
+  </div>`;
+}
+
+function pinGateHTML() {
+  const isNew = !state.financeiroPin;
+  return `
+  <div class="pin-wrap">
+    <div class="card" style="text-align:center;">
+      <div class="pin-circle">${icon('lock', 18, 'var(--primary)')}</div>
+      <h2 style="font-size:16px;font-weight:600;margin:0 0 4px;">Área financeira</h2>
+      <p style="font-size:13px;color:var(--ink-soft);margin:0 0 16px;">${isNew ? 'Crie um PIN para proteger o cadastro de produtos, o relatório de vendas e a chave Pix.' : 'Digite o PIN para entrar.'}</p>
+      <input id="pin-input" type="password" inputmode="numeric" class="pin-input" data-enter="pinSubmit" placeholder="${isNew ? 'Novo PIN (mín. 4 dígitos)' : 'PIN'}" autofocus />
+      ${isNew ? `<input id="pin-confirm-input" type="password" inputmode="numeric" class="pin-input" data-enter="pinSubmit" placeholder="Confirmar PIN" />` : ''}
+      ${state.pinGateError ? `<p class="error-text">${escapeHtml(state.pinGateError)}</p>` : ''}
+      <button class="btn btn-primary" style="width:100%;justify-content:center;margin-top:8px;" data-action="pin-submit">${isNew ? 'Criar PIN e entrar' : 'Entrar'}</button>
+      <button class="btn" style="width:100%;justify-content:center;margin-top:8px;border-color:transparent;background:none;" data-action="exit-financeiro">Voltar ao caixa</button>
+    </div>
+  </div>`;
+}
+
+function fieldHTML({ id, label, value = '', placeholder = '', mono = false, type = 'text', enter = null }) {
+  return `
+    <div class="field">
+      <label class="field-label">${label}</label>
+      <div class="input-wrap">
+        <input id="${id}" type="${type}" ${enter ? `data-enter="${enter}"` : ''} class="${mono ? 'mono' : ''}" value="${escapeHtml(value)}" placeholder="${escapeHtml(placeholder)}" />
+      </div>
+    </div>`;
+}
+
+function produtosHTML() {
+  const editing = state.editingProductId ? state.products.find(p => p.id === state.editingProductId) : null;
+  const search = state.produtosSearch;
+  const filtered = state.products.filter(p => p.name.toLowerCase().includes(search.toLowerCase()) || p.barcode.includes(search));
+  const lowStock = state.products.filter(p => p.stock <= 5);
+
+  return `
+  <div class="grid5">
+    <div class="col2 stack">
+      <div class="card">
+        <h2 style="font-size:14px;font-weight:600;margin:0 0 12px;">${editing ? 'Editar produto' : 'Novo produto'}</h2>
+        ${fieldHTML({ id: 'pf-barcode', label: 'Código de barras', value: editing?.barcode || '', placeholder: '7891234567890', mono: true, enter: 'submitProductForm' })}
+        ${fieldHTML({ id: 'pf-name', label: 'Nome do produto', value: editing?.name || '', placeholder: 'Arroz branco 5kg', enter: 'submitProductForm' })}
+        <div class="row">
+          ${fieldHTML({ id: 'pf-price', label: 'Preço (R$)', value: editing ? String(editing.price) : '', placeholder: '0,00', mono: true, enter: 'submitProductForm' })}
+          ${fieldHTML({ id: 'pf-stock', label: 'Estoque', value: editing ? String(editing.stock) : '', placeholder: '0', mono: true, enter: 'submitProductForm' })}
+        </div>
+        ${fieldHTML({ id: 'pf-category', label: 'Categoria (opcional)', value: editing?.category || '', placeholder: 'Mercearia, hortifruti, limpeza…', enter: 'submitProductForm' })}
+        ${state.formError ? `<p class="error-text">${escapeHtml(state.formError)}</p>` : ''}
+        <div style="display:flex;gap:8px;margin-top:4px;">
+          <button class="btn btn-primary" style="flex:1;justify-content:center;" data-action="submit-product-form">${editing ? 'Salvar alterações' : 'Cadastrar produto'}</button>
+          ${editing ? `<button class="btn" data-action="reset-product-form">${icon('x', 15)}</button>` : ''}
+        </div>
+      </div>
+
+      ${lowStock.length > 0 ? `
+        <div class="card">
+          <h3 style="font-size:13px;font-weight:600;margin:0 0 8px;color:var(--danger);display:flex;align-items:center;gap:6px;">${icon('alert', 14)} Estoque baixo</h3>
+          ${lowStock.map(p => `<div style="display:flex;justify-content:space-between;font-size:13px;padding:3px 0;"><span>${escapeHtml(p.name)}</span><span class="mono" style="color:var(--danger);">${p.stock} un.</span></div>`).join('')}
+        </div>` : ''}
+    </div>
+
+    <div class="col3">
+      <div class="card">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+          <h2 style="font-size:14px;font-weight:600;margin:0;">Produtos cadastrados (${state.products.length})</h2>
+          <div class="input-wrap" style="padding:6px 10px;">
+            ${icon('search', 13, 'var(--ink-soft)')}
+            <input id="produtos-search" style="width:150px;font-size:12px;" placeholder="Buscar por nome ou código" value="${escapeHtml(state.produtosSearch)}" />
+          </div>
+        </div>
+        ${state.products.length === 0
+          ? `<p class="empty">Cadastre o primeiro produto usando o formulário ao lado.</p>`
+          : filtered.length === 0
+            ? `<p class="empty">Nada encontrado para "${escapeHtml(search)}".</p>`
+            : filtered.map(p => `
+              <div class="prod-row">
+                <div style="min-width:0;">
+                  <div style="font-size:13.5px;font-weight:500;">${escapeHtml(p.name)}</div>
+                  <div class="mono" style="font-size:11.5px;color:var(--ink-soft);">${escapeHtml(p.barcode)}${p.category ? ' · ' + escapeHtml(p.category) : ''}</div>
+                </div>
+                <div style="display:flex;align-items:center;gap:14px;flex-shrink:0;">
+                  <span class="mono" style="font-size:13px;">${brl(p.price)}</span>
+                  <span class="mono" style="font-size:12px;width:56px;text-align:right;color:${p.stock <= 5 ? 'var(--danger)' : 'var(--ink-soft)'}">${p.stock} un.</span>
+                  <button class="icon-btn" data-action="edit-product" data-id="${p.id}" style="color:var(--primary-dark);">${icon('pencil', 14)}</button>
+                  <button class="icon-btn" data-action="remove-product" data-id="${p.id}" style="color:var(--danger);">${icon('trash', 14)}</button>
+                </div>
+              </div>`).join('')}
+      </div>
+    </div>
+  </div>`;
+}
+
+function relatorioHTML() {
+  const todaySales = state.sales.filter(s => new Date(s.datetime).toDateString() === todayStr());
+  const totalToday = todaySales.reduce((s, v) => s + v.total, 0);
+  const totalGeral = state.sales.reduce((s, v) => s + v.total, 0);
+  const byMethodToday = { dinheiro: 0, cartao: 0, pix: 0 };
+  todaySales.forEach(s => byMethodToday[s.payment] += s.total);
+
+  const days = Array.from({ length: 7 }, (_, i) => { const d = new Date(); d.setDate(d.getDate() - (6 - i)); return d; });
+  const dayTotals = days.map(d => ({ date: d, total: state.sales.filter(s => new Date(s.datetime).toDateString() === d.toDateString()).reduce((s, v) => s + v.total, 0) }));
+  const maxDay = Math.max(1, ...dayTotals.map(d => d.total));
+
+  return `
+  <div class="stack">
+    <div class="grid5">
+      <div class="col2" style="grid-column:span 2;">
+        <div class="stat-card" style="background:var(--primary);color:#fff;">
+          <div class="lbl">Vendido hoje</div>
+          <div class="val mono">${brl(totalToday)}</div>
+          <div class="sub">${todaySales.length} venda(s)</div>
+        </div>
+      </div>
+      <div class="col2" style="grid-column:span 2;">
+        <div class="stat-card" style="background:var(--gold);">
+          <div class="lbl">Total acumulado</div>
+          <div class="val mono">${brl(totalGeral)}</div>
+          <div class="sub">${state.sales.length} venda(s) no total</div>
+        </div>
+      </div>
+      <div style="grid-column:span 1;">
+        <div class="card" style="height:100%;">
+          <p style="font-size:11px;font-weight:600;text-transform:uppercase;color:var(--ink-soft);margin:0 0 8px;">Hoje por pagamento</p>
+          ${Object.entries(PAY).map(([key, p]) => `
+            <div style="display:flex;justify-content:space-between;font-size:12.5px;padding:2px 0;">
+              <span style="display:flex;align-items:center;gap:5px;"><span style="width:7px;height:7px;border-radius:99px;background:${p.hex};display:inline-block;"></span>${p.label}</span>
+              <span class="mono">${brl(byMethodToday[key])}</span>
+            </div>`).join('')}
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <p style="font-size:11px;font-weight:600;text-transform:uppercase;color:var(--ink-soft);margin:0 0 16px;">Últimos 7 dias</p>
+      <div class="bars">
+        ${dayTotals.map(({ date, total }) => {
+          const isToday = date.toDateString() === todayStr();
+          const h = total > 0 ? Math.max(6, (total / maxDay) * 100) : 3;
+          return `<div class="bar-col">
+            <span class="mono" style="font-size:10px;color:var(--ink-soft);">${total > 0 ? brl(total).replace('R$', '').trim() : ''}</span>
+            <div class="bar" style="height:${h}%;background:${isToday ? 'var(--gold)' : 'var(--primary)'};opacity:${isToday ? 1 : .75};"></div>
+            <span style="font-size:10px;color:var(--ink-soft);">${date.toLocaleDateString('pt-BR', { weekday: 'short' }).replace('.', '')}</span>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>
+
+    <div class="card">
+      <p style="font-size:11px;font-weight:600;text-transform:uppercase;color:var(--ink-soft);margin:0 0 8px;">Histórico de vendas</p>
+      ${state.sales.length === 0 ? `<p class="empty">Nenhuma venda registrada ainda.</p>` : state.sales.slice(0, 40).map(s => {
+        const p = PAY[s.payment];
+        return `<div class="sale-row">
+          <div style="min-width:0;">
+            <div style="font-size:13px;font-weight:500;">${new Date(s.datetime).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</div>
+            <div style="font-size:11.5px;color:var(--ink-soft);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${s.items.length} item(ns) · ${s.items.map(i => escapeHtml(i.name)).join(', ')}</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px;flex-shrink:0;">
+            <span class="pay-chip" style="background:${p.hex}1A;color:${p.hex};">${icon(p.icon, 11)} ${p.label}</span>
+            <span class="mono" style="font-size:13px;width:76px;text-align:right;">${brl(s.total)}</span>
+          </div>
+        </div>`;
+      }).join('')}
+    </div>
+  </div>`;
+}
+
+function configHTML() {
+  const cfg = state.pixConfig;
+  return `
+  <div style="max-width:560px;" class="stack">
+    <div class="card">
+      <h2 style="font-size:14px;font-weight:600;margin:0 0 2px;display:flex;align-items:center;gap:6px;">${icon('qr', 15, 'var(--pix)')} Chave Pix para recebimento</h2>
+      <p style="font-size:12px;color:var(--ink-soft);margin:0 0 12px;">Usada para gerar o QR Code no caixa. Só quem acessa a área financeira pode ver ou alterar essa chave.</p>
+      ${fieldHTML({ id: 'cfg-key', label: 'Chave Pix (CPF, CNPJ, e-mail, telefone ou aleatória)', value: cfg.key, placeholder: '00000000000', mono: true, enter: 'savePixConfig' })}
+      <div class="row">
+        ${fieldHTML({ id: 'cfg-name', label: 'Nome do recebedor', value: cfg.name, placeholder: 'Nome do titular', enter: 'savePixConfig' })}
+        ${fieldHTML({ id: 'cfg-city', label: 'Cidade', value: cfg.city, placeholder: 'Sua cidade', enter: 'savePixConfig' })}
+      </div>
+      <button class="btn btn-primary" data-action="save-pix-config">Salvar chave Pix</button>
+      ${state.configSaved ? `<span class="flash" style="color:var(--primary-dark);">${icon('check', 13)} Salvo</span>` : ''}
+    </div>
+
+    <div class="card">
+      <h2 style="font-size:14px;font-weight:600;margin:0 0 2px;display:flex;align-items:center;gap:6px;">${icon('key', 15, 'var(--primary-dark)')} PIN de acesso ao financeiro</h2>
+      <p style="font-size:12px;color:var(--ink-soft);margin:0 0 12px;">Esse PIN protege produtos, relatório e a chave Pix contra acesso pelo caixa.</p>
+      ${fieldHTML({ id: 'pin-old', label: 'PIN atual', type: 'password' })}
+      <div class="row">
+        ${fieldHTML({ id: 'pin-new', label: 'Novo PIN', type: 'password' })}
+        ${fieldHTML({ id: 'pin-new2', label: 'Confirmar novo PIN', type: 'password' })}
+      </div>
+      ${state.pinChangeError ? `<p class="error-text">${escapeHtml(state.pinChangeError)}</p>` : ''}
+      <button class="btn" data-action="change-pin-btn">Alterar PIN</button>
+      ${state.pinSaved ? `<span class="flash" style="color:var(--primary-dark);">${icon('check', 13)} PIN alterado</span>` : ''}
+    </div>
+  </div>`;
+}
+
+function buildHTML() {
+  if (state.loading) {
+    return `<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;"><div style="display:flex;align-items:center;gap:8px;font-size:14px;color:var(--ink-soft);">${icon('scan', 18)} Carregando o caixa…</div></div>`;
+  }
+  let mainContent = '';
+  if (state.area === 'caixa') {
+    mainContent = caixaHTML();
+  } else if (state.area === 'financeiro' && !state.unlocked) {
+    mainContent = pinGateHTML();
+  } else if (state.area === 'financeiro' && state.unlocked) {
+    if (state.tab === 'produtos') mainContent = produtosHTML();
+    else if (state.tab === 'relatorio') mainContent = relatorioHTML();
+    else if (state.tab === 'config') mainContent = configHTML();
+  }
+  return `${headerHTML()}<main>${mainContent}</main>`;
+}
+
+// ---------------------------------------------------------------------------
+// Eventos (delegação)
+// ---------------------------------------------------------------------------
+const ENTER_ACTIONS = {
+  addByBarcode: () => addByBarcode(document.getElementById('barcode-input').value),
+  saveName: () => {
+    const val = (document.getElementById('name-input') || {}).value || '';
+    saveStoreName(val.trim() || 'Peachmart');
+    state.editingName = false;
+    render();
+  },
+  submitProductForm: () => submitProductForm(),
+  pinSubmit: () => pinSubmit(),
+  savePixConfig: () => savePixConfigHandler(),
+};
+
+root.addEventListener('click', (e) => {
+  const t = e.target.closest('[data-action]');
+  if (!t) return;
+  const action = t.dataset.action;
+  if (action === 'toggle-edit-name') { state.editingName = true; render(); focusById('name-input'); }
+  else if (action === 'enter-financeiro') enterFinanceiro();
+  else if (action === 'exit-financeiro') exitFinanceiro();
+  else if (action === 'set-tab') { state.tab = t.dataset.tab; render(); }
+  else if (action === 'add-to-cart') { const p = state.products.find(pr => pr.barcode === t.dataset.barcode); addToCart(p, 1); render(); }
+  else if (action === 'change-qty') { changeQty(t.dataset.barcode, parseInt(t.dataset.delta, 10)); render(); }
+  else if (action === 'remove-item') { removeItem(t.dataset.barcode); render(); }
+  else if (action === 'set-payment') { state.payment = t.dataset.payment; render(); }
+  else if (action === 'finalize-sale') finalizeSale();
+  else if (action === 'copy-pix') copyPixCode();
+  else if (action === 'edit-product') editProduct(t.dataset.id);
+  else if (action === 'remove-product') removeProductHandler(t.dataset.id);
+  else if (action === 'reset-product-form') resetProductForm();
+  else if (action === 'submit-product-form') submitProductForm();
+  else if (action === 'pin-submit') pinSubmit();
+  else if (action === 'save-pix-config') savePixConfigHandler();
+  else if (action === 'change-pin-btn') changePinHandler();
+});
+
+root.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && e.target.dataset && e.target.dataset.enter) {
+    e.preventDefault();
+    const fn = ENTER_ACTIONS[e.target.dataset.enter];
+    if (fn) fn();
+  }
+});
+
+root.addEventListener('input', (e) => {
+  const id = e.target.id;
+  if (id === 'barcode-input') { state.code = e.target.value; }
+  else if (id === 'catalog-search') { state.catalogSearch = e.target.value; render(); }
+  else if (id === 'produtos-search') { state.produtosSearch = e.target.value; render(); }
+  else if (id === 'received-input') { state.receivedStr = e.target.value; render(); }
+  else if (id === 'pin-input' || id === 'pin-confirm-input' || id === 'pin-old' || id === 'pin-new' || id === 'pin-new2') {
+    e.target.value = e.target.value.replace(/\D/g, '');
+  }
+});
+
+root.addEventListener('blur', (e) => {
+  if (e.target && e.target.id === 'name-input') {
+    const val = e.target.value || '';
+    saveStoreName(val.trim() || 'Peachmart');
+    state.editingName = false;
+    render();
+  }
+}, true);
+
+// ---------------------------------------------------------------------------
+loadData();
+</script>
 </body>
 </html>
