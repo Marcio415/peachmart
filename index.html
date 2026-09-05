@@ -32,6 +32,10 @@
   .nav{display:inline-flex;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:4px;gap:2px;}
   .nav button{background:none;border:none;padding:7px 12px;border-radius:7px;font-size:13px;font-weight:500;color:var(--ink-soft);display:flex;align-items:center;gap:6px;}
   .nav button.active{background:var(--primary);color:#fff;}
+  .menu-btn{background:var(--bg);border:1px solid var(--line);border-radius:10px;width:36px;height:36px;display:flex;align-items:center;justify-content:center;color:var(--ink-soft);padding:0;}
+  .menu-bar{max-width:1100px;margin:0 auto;padding:10px 20px 14px;border-top:1px solid var(--line);display:flex;gap:8px;flex-wrap:wrap;}
+  .menu-bar button{background:var(--bg);border:1px solid var(--line);border-radius:9px;padding:8px 13px;font-size:13px;font-weight:500;color:var(--ink-soft);display:flex;align-items:center;gap:6px;}
+  .menu-bar button.active{background:var(--primary);color:#fff;border-color:var(--primary);}
   main{max-width:1100px;margin:0 auto;padding:22px 20px 60px;}
   .card{background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:16px;}
   .grid5{display:grid;grid-template-columns:repeat(5,1fr);gap:22px;}
@@ -93,6 +97,17 @@
   .pin-wrap{max-width:360px;margin:32px auto 0;text-align:center;}
   .pin-circle{width:44px;height:44px;border-radius:99px;background:var(--bg);display:flex;align-items:center;justify-content:center;margin:0 auto 12px;}
   .pin-input{width:100%;text-align:center;letter-spacing:.5em;font-size:18px;border:1px solid var(--line);background:var(--bg);border-radius:10px;padding:11px;outline:none;margin-bottom:8px;}
+
+  /* Situação / Fechamento de caixa */
+  .kv-row{display:flex;justify-content:space-between;font-size:13px;padding:2px 0;}
+  .kv-row.total{font-weight:700;border-top:1px dashed var(--line);padding-top:8px;margin-top:4px;}
+
+  @media print {
+    body *{visibility:hidden;}
+    #print-area, #print-area *{visibility:visible;}
+    #print-area{position:absolute;left:0;top:0;width:100%;padding:0;border:none;}
+    .no-print{display:none !important;}
+  }
 </style>
 </head>
 <body>
@@ -164,6 +179,9 @@ const ICONS = {
 function icon(name, size = 16, color = 'currentColor') {
   return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICONS[name] || ''}</svg>`;
 }
+function dotsIcon(size = 19, color = 'currentColor') {
+  return `<svg width="${size}" height="${size}" viewBox="0 0 24 24"><circle cx="12" cy="5" r="2" fill="${color}"/><circle cx="12" cy="12" r="2" fill="${color}"/><circle cx="12" cy="19" r="2" fill="${color}"/></svg>`;
+}
 
 const PAY = {
   dinheiro: { label: 'Dinheiro', color: 'var(--dinheiro)', hex: '#4C7A3A', icon: 'banknote' },
@@ -180,11 +198,15 @@ const state = {
   editingName: false,
   products: [],
   sales: [],
+  withdrawals: [],
+  cashClosures: [],
   pixConfig: { key: '', name: '', city: '' },
-  financeiroPin: null,
-  area: 'caixa',        // 'caixa' | 'financeiro'
-  unlocked: false,
+  users: [],
+  currentUser: null,     // { id, name, role } — sessão atual (não persistido)
+  loginError: '',
+  area: null,            // null (a decidir) | 'caixa' | 'financeiro'
   tab: 'produtos',       // aba dentro do financeiro
+  caixaTab: 'venda',     // 'venda' | 'retirada' | 'fechar'
   cart: [],
   code: '',
   notFound: '',
@@ -196,10 +218,15 @@ const state = {
   produtosSearch: '',
   editingProductId: null,
   formError: '',
-  pinGateError: '',
   configSaved: false,
-  pinChangeError: '',
-  pinSaved: false,
+  withdrawalError: '',
+  withdrawalSuccess: null,
+  closureError: '',
+  lastClosureResult: null,
+  navMenuOpen: false,
+  editingUserId: null,
+  userFormError: '',
+  userSaved: false,
 };
 
 const root = document.getElementById('root');
@@ -228,20 +255,24 @@ function focusById(id) { const el = document.getElementById(id); if (el) el.focu
 async function loadData() {
   try { const r = await window.storage.get('products', false); state.products = r ? JSON.parse(r.value) : []; } catch (e) { state.products = []; }
   try { const r = await window.storage.get('sales', false); state.sales = r ? JSON.parse(r.value) : []; } catch (e) { state.sales = []; }
+  try { const r = await window.storage.get('withdrawals', false); state.withdrawals = r ? JSON.parse(r.value) : []; } catch (e) { state.withdrawals = []; }
+  try { const r = await window.storage.get('cash_closures', false); state.cashClosures = r ? JSON.parse(r.value) : []; } catch (e) { state.cashClosures = []; }
   try {
     const r = await window.storage.get('store_name', false);
     state.storeName = (r && r.value && r.value !== 'Meu Mercado') ? r.value : 'Peachmart';
   } catch (e) { state.storeName = 'Peachmart'; }
   try { const r = await window.storage.get('pix_config', false); if (r) state.pixConfig = JSON.parse(r.value); } catch (e) {}
-  try { const r = await window.storage.get('financeiro_pin', false); if (r) state.financeiroPin = r.value; } catch (e) { state.financeiroPin = null; }
+  try { const r = await window.storage.get('users', false); state.users = r ? JSON.parse(r.value) : []; } catch (e) { state.users = []; }
   state.loading = false;
   render();
 }
 function saveProducts(list) { state.products = list; window.storage.set('products', JSON.stringify(list), false).catch(() => {}); }
 function saveSales(list) { state.sales = list; window.storage.set('sales', JSON.stringify(list), false).catch(() => {}); }
+function saveWithdrawals(list) { state.withdrawals = list; window.storage.set('withdrawals', JSON.stringify(list), false).catch(() => {}); }
+function saveCashClosures(list) { state.cashClosures = list; window.storage.set('cash_closures', JSON.stringify(list), false).catch(() => {}); }
 function saveStoreName(name) { state.storeName = name; window.storage.set('store_name', name, false).catch(() => {}); }
 function savePixConfig(cfg) { state.pixConfig = cfg; window.storage.set('pix_config', JSON.stringify(cfg), false).catch(() => {}); }
-function savePin(pin) { state.financeiroPin = pin; window.storage.set('financeiro_pin', pin, false).catch(() => {}); }
+function saveUsers(list) { state.users = list; window.storage.set('users', JSON.stringify(list), false).catch(() => {}); }
 
 // ---------------------------------------------------------------------------
 // Ações — Caixa
@@ -300,7 +331,7 @@ function finalizeSale() {
   const total = computeTotal();
   const receivedNum = state.payment === 'dinheiro' ? parseFloat((state.receivedStr || '0').replace(',', '.')) : undefined;
   const troco = state.payment === 'dinheiro' ? receivedNum - total : undefined;
-  const sale = { id: uid(), datetime: new Date().toISOString(), items: state.cart.map((i) => ({ ...i })), total, payment: state.payment, received: receivedNum, troco };
+  const sale = { id: uid(), datetime: new Date().toISOString(), items: state.cart.map((i) => ({ ...i })), total, payment: state.payment, received: receivedNum, troco, operator: state.currentUser?.name || null };
   saveSales([sale, ...state.sales]);
   const next = state.products.map((p) => {
     const item = state.cart.find((i) => i.barcode === p.barcode);
@@ -326,23 +357,137 @@ function copyPixCode() {
 }
 
 // ---------------------------------------------------------------------------
-// Ações — navegação / financeiro
+// Ações — Retirada de valores / Fechamento de caixa
 // ---------------------------------------------------------------------------
-function enterFinanceiro() { state.area = 'financeiro'; state.tab = 'produtos'; render(); }
-function exitFinanceiro() { state.area = 'caixa'; state.unlocked = false; state.pinGateError = ''; render(); focusById('barcode-input'); }
+function lastClosureDatetime() { return state.cashClosures.length ? state.cashClosures[0].datetime : null; }
+function periodSales() {
+  const since = lastClosureDatetime();
+  return state.sales.filter((s) => !since || new Date(s.datetime) > new Date(since));
+}
+function periodWithdrawals() {
+  const since = lastClosureDatetime();
+  return state.withdrawals.filter((w) => !since || new Date(w.datetime) > new Date(since));
+}
+function periodTotals() {
+  const sales = periodSales();
+  const totals = { dinheiro: 0, cartao: 0, pix: 0 };
+  sales.forEach((s) => (totals[s.payment] += s.total));
+  const totalGeral = totals.dinheiro + totals.cartao + totals.pix;
+  const retiradas = periodWithdrawals().reduce((s, w) => s + w.amount, 0);
+  const expectedCash = totals.dinheiro - retiradas;
+  return { salesCount: sales.length, totals, totalGeral, retiradas, expectedCash };
+}
+function submitWithdrawal() {
+  const amountRaw = (document.getElementById('wd-amount') || {}).value || '';
+  const reason = (document.getElementById('wd-reason') || {}).value || '';
+  const amount = parseFloat(amountRaw.replace(',', '.'));
+  if (isNaN(amount) || amount <= 0) { state.withdrawalError = 'Informe um valor válido.'; render(); return; }
+  const w = { id: uid(), datetime: new Date().toISOString(), amount, reason: reason.trim(), operator: state.currentUser?.name || null };
+  saveWithdrawals([w, ...state.withdrawals]);
+  state.withdrawalSuccess = w;
+  state.withdrawalError = '';
+  render();
+  setTimeout(() => { if (state.withdrawalSuccess && state.withdrawalSuccess.id === w.id) { state.withdrawalSuccess = null; render(); } }, 3000);
+}
+function submitCashClosure() {
+  const informedRaw = (document.getElementById('close-informed') || {}).value || '';
+  const informedCash = parseFloat(informedRaw.replace(',', '.'));
+  if (isNaN(informedCash) || informedCash < 0) { state.closureError = 'Informe o valor em dinheiro contado no caixa.'; render(); return; }
+  const pt = periodTotals();
+  const closure = {
+    id: uid(),
+    datetime: new Date().toISOString(),
+    salesCount: pt.salesCount,
+    totalDinheiro: pt.totals.dinheiro,
+    totalCartao: pt.totals.cartao,
+    totalPix: pt.totals.pix,
+    totalGeral: pt.totalGeral,
+    retiradas: pt.retiradas,
+    expectedCash: pt.expectedCash,
+    informedCash,
+    difference: informedCash - pt.expectedCash,
+    operator: state.currentUser?.name || null,
+  };
+  saveCashClosures([closure, ...state.cashClosures]);
+  state.closureError = '';
+  state.lastClosureResult = closure;
+  render();
+}
 
-function pinSubmit() {
-  const pinVal = (document.getElementById('pin-input') || {}).value || '';
-  if (!state.financeiroPin) {
-    const confirmVal = (document.getElementById('pin-confirm-input') || {}).value || '';
-    if (pinVal.length < 4) { state.pinGateError = 'O PIN deve ter pelo menos 4 dígitos.'; render(); return; }
-    if (pinVal !== confirmVal) { state.pinGateError = 'Os PINs digitados não coincidem.'; render(); return; }
-    savePin(pinVal);
-    state.unlocked = true; state.pinGateError = ''; render();
+// ---------------------------------------------------------------------------
+// Ações — usuários / login
+// ---------------------------------------------------------------------------
+function submitBootstrap() {
+  const name = (document.getElementById('bs-name') || {}).value?.trim() || '';
+  const pass = (document.getElementById('bs-pass') || {}).value || '';
+  const pass2 = (document.getElementById('bs-pass2') || {}).value || '';
+  if (!name) { state.loginError = 'Informe seu nome.'; render(); return; }
+  if (pass.length < 4) { state.loginError = 'A senha deve ter pelo menos 4 caracteres.'; render(); return; }
+  if (pass !== pass2) { state.loginError = 'As senhas não coincidem.'; render(); return; }
+  const user = { id: uid(), name, password: pass, role: 'ambos' };
+  saveUsers([user]);
+  state.currentUser = { id: user.id, name: user.name, role: user.role };
+  state.loginError = '';
+  state.area = null;
+  render();
+}
+function submitLogin() {
+  const userId = (document.getElementById('login-user') || {}).value || '';
+  const pass = (document.getElementById('login-pass') || {}).value || '';
+  const user = state.users.find((u) => u.id === userId);
+  if (!user || user.password !== pass) { state.loginError = 'Usuário ou senha incorretos.'; render(); return; }
+  state.currentUser = { id: user.id, name: user.name, role: user.role };
+  state.loginError = '';
+  if (user.role === 'caixa') { state.area = 'caixa'; state.caixaTab = 'venda'; }
+  else if (user.role === 'financeiro') { state.area = 'financeiro'; state.tab = 'produtos'; }
+  else { state.area = null; }
+  render();
+}
+function logout() {
+  state.currentUser = null;
+  state.area = null;
+  state.caixaTab = 'venda';
+  state.navMenuOpen = false;
+  state.loginError = '';
+  render();
+}
+
+// ---------------------------------------------------------------------------
+// Ações — Gestão de usuários (financeiro)
+// ---------------------------------------------------------------------------
+function submitUserForm() {
+  const name = (document.getElementById('uf-name') || {}).value?.trim() || '';
+  const role = (document.getElementById('uf-role') || {}).value || 'caixa';
+  const pass = (document.getElementById('uf-pass') || {}).value || '';
+  const pass2 = (document.getElementById('uf-pass2') || {}).value || '';
+  if (!name) { state.userFormError = 'Informe o nome.'; render(); return; }
+  const dupName = state.users.find((u) => u.name.toLowerCase() === name.toLowerCase() && u.id !== state.editingUserId);
+  if (dupName) { state.userFormError = 'Já existe um usuário com esse nome.'; render(); return; }
+
+  if (state.editingUserId) {
+    if (pass || pass2) {
+      if (pass.length < 4) { state.userFormError = 'A senha deve ter pelo menos 4 caracteres.'; render(); return; }
+      if (pass !== pass2) { state.userFormError = 'As senhas não coincidem.'; render(); return; }
+    }
+    saveUsers(state.users.map((u) => u.id === state.editingUserId ? { ...u, name, role, password: pass ? pass : u.password } : u));
+    if (state.currentUser && state.currentUser.id === state.editingUserId) state.currentUser = { ...state.currentUser, name, role };
   } else {
-    if (pinVal === state.financeiroPin) { state.unlocked = true; state.pinGateError = ''; render(); }
-    else { state.pinGateError = 'PIN incorreto.'; render(); focusById('pin-input'); }
+    if (pass.length < 4) { state.userFormError = 'A senha deve ter pelo menos 4 caracteres.'; render(); return; }
+    if (pass !== pass2) { state.userFormError = 'As senhas não coincidem.'; render(); return; }
+    saveUsers([...state.users, { id: uid(), name, role, password: pass }]);
   }
+  state.editingUserId = null;
+  state.userFormError = '';
+  state.userSaved = true;
+  render();
+  setTimeout(() => { state.userSaved = false; render(); }, 2200);
+}
+function resetUserForm() { state.editingUserId = null; state.userFormError = ''; render(); }
+function editUser(id) { state.editingUserId = id; state.userFormError = ''; render(); focusById('uf-name'); }
+function removeUserHandler(id) {
+  if (state.users.length <= 1) return;
+  saveUsers(state.users.filter((u) => u.id !== id));
+  if (state.editingUserId === id) resetUserForm(); else render();
 }
 
 // ---------------------------------------------------------------------------
@@ -386,17 +531,6 @@ function savePixConfigHandler() {
   state.configSaved = true; render();
   setTimeout(() => { state.configSaved = false; render(); }, 2200);
 }
-function changePinHandler() {
-  const oldPin = (document.getElementById('pin-old') || {}).value || '';
-  const newPin = (document.getElementById('pin-new') || {}).value || '';
-  const newPin2 = (document.getElementById('pin-new2') || {}).value || '';
-  if (oldPin !== state.financeiroPin) { state.pinChangeError = 'PIN atual incorreto.'; render(); return; }
-  if (newPin.length < 4) { state.pinChangeError = 'O novo PIN deve ter pelo menos 4 dígitos.'; render(); return; }
-  if (newPin !== newPin2) { state.pinChangeError = 'Os PINs digitados não coincidem.'; render(); return; }
-  savePin(newPin);
-  state.pinChangeError = ''; state.pinSaved = true; render();
-  setTimeout(() => { state.pinSaved = false; render(); }, 2200);
-}
 
 // ---------------------------------------------------------------------------
 // Templates
@@ -405,33 +539,55 @@ function headerHTML() {
   const financeiroTabs = [
     { id: 'produtos', label: 'Produtos', icon: 'package' },
     { id: 'relatorio', label: 'Relatório', icon: 'chart' },
+    { id: 'situacao', label: 'Situação do caixa', icon: 'chart' },
     { id: 'config', label: 'Configurações', icon: 'settings' },
+  ];
+  const caixaTabs = [
+    { id: 'venda', label: 'Venda', icon: 'cart' },
+    { id: 'retirada', label: 'Retirada', icon: 'minus' },
+    { id: 'fechar', label: 'Fechar caixa', icon: 'lock' },
   ];
   const nameBlock = state.editingName
     ? `<input id="name-input" class="name-input" data-enter="saveName" value="${escapeHtml(state.storeName)}" />`
     : `<button class="name-btn" data-action="toggle-edit-name"><h1>${escapeHtml(state.storeName)}</h1>${icon('pencil', 12, 'var(--ink-soft)')}</button>`;
 
-  const rightBlock = state.area === 'caixa'
-    ? `<button class="btn" data-action="enter-financeiro">${icon('lock', 13)} Área financeira</button>`
-    : `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-        ${state.unlocked ? `<nav class="nav">${financeiroTabs.map(t => `<button data-action="set-tab" data-tab="${t.id}" class="${state.tab === t.id ? 'active' : ''}">${icon(t.icon, 14)} ${t.label}</button>`).join('')}</nav>` : ''}
-        <button class="btn" data-action="exit-financeiro">${icon('cart', 13)} Voltar ao caixa</button>
+  const isAmbos = state.currentUser && state.currentUser.role === 'ambos';
+  const areaSwitchBtn = isAmbos
+    ? (state.area === 'caixa'
+        ? `<button class="btn" data-action="go-financeiro">${icon('lock', 13)} Ir para Financeiro</button>`
+        : `<button class="btn" data-action="go-caixa">${icon('cart', 13)} Ir para Caixa</button>`)
+    : '';
+  const logoutBtn = `<button class="btn no-print" data-action="logout" style="border-color:transparent;background:none;">Sair</button>`;
+  const kebabBtn = `<button class="menu-btn no-print" data-action="toggle-nav-menu" title="Menu">${dotsIcon(19)}</button>`;
+
+  const rightBlock = `<div class="no-print" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+        ${kebabBtn}
+        ${areaSwitchBtn}
+        ${logoutBtn}
       </div>`;
 
+  const barItems = state.area === 'caixa' ? caixaTabs : financeiroTabs;
+  const barActionName = state.area === 'caixa' ? 'set-caixa-tab' : 'set-tab';
+  const barActiveId = state.area === 'caixa' ? state.caixaTab : state.tab;
+  const menuBar = state.navMenuOpen
+    ? `<div class="menu-bar no-print">${barItems.map(t => `<button data-action="${barActionName}" data-tab="${t.id}" class="${barActiveId === t.id ? 'active' : ''}">${icon(t.icon, 14)} ${t.label}</button>`).join('')}</div>`
+    : '';
+
   return `
-  <header class="header">
+  <header class="header no-print">
     <div class="header-inner">
       <div class="brand">
         <div class="brand-icon">${icon('scan', 17, '#fff')}</div>
         ${nameBlock}
-        <span class="badge ${state.area}">${state.area === 'caixa' ? 'Caixa' : 'Financeiro'}</span>
+        <span class="badge ${state.area}">${state.area === 'caixa' ? 'Caixa' : 'Financeiro'}${state.currentUser ? ' · ' + escapeHtml(state.currentUser.name) : ''}</span>
       </div>
       ${rightBlock}
     </div>
+    ${menuBar}
   </header>`;
 }
 
-function caixaHTML() {
+function caixaVendaHTML() {
   const total = computeTotal();
   const pixReady = !!(state.pixConfig && state.pixConfig.key);
   const search = state.catalogSearch;
@@ -546,19 +702,154 @@ function caixaHTML() {
   </div>`;
 }
 
-function pinGateHTML() {
-  const isNew = !state.financeiroPin;
+function caixaHTML() {
+  if (state.caixaTab === 'retirada') return caixaRetiradaHTML();
+  if (state.caixaTab === 'fechar') return caixaFecharHTML();
+  return caixaVendaHTML();
+}
+
+function periodWithdrawalsList() {
+  const list = periodWithdrawals();
+  if (list.length === 0) return `<p class="empty" style="margin-top:14px;">Nenhuma retirada registrada neste turno.</p>`;
+  return `<div style="margin-top:16px;">
+    <p style="font-size:11px;font-weight:600;text-transform:uppercase;color:var(--ink-soft);margin:0 0 6px;">Retiradas deste turno</p>
+    ${list.map(w => `<div class="sale-row">
+      <div>
+        <div style="font-size:13px;">${new Date(w.datetime).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</div>
+        ${w.reason ? `<div style="font-size:11.5px;color:var(--ink-soft);">${escapeHtml(w.reason)}${w.operator ? ' · ' + escapeHtml(w.operator) : ''}</div>` : (w.operator ? `<div style="font-size:11.5px;color:var(--ink-soft);">${escapeHtml(w.operator)}</div>` : '')}
+      </div>
+      <span class="mono" style="font-size:13px;">${brl(w.amount)}</span>
+    </div>`).join('')}
+  </div>`;
+}
+
+function caixaRetiradaHTML() {
   return `
-  <div class="pin-wrap">
-    <div class="card" style="text-align:center;">
-      <div class="pin-circle">${icon('lock', 18, 'var(--primary)')}</div>
-      <h2 style="font-size:16px;font-weight:600;margin:0 0 4px;">Área financeira</h2>
-      <p style="font-size:13px;color:var(--ink-soft);margin:0 0 16px;">${isNew ? 'Crie um PIN para proteger o cadastro de produtos, o relatório de vendas e a chave Pix.' : 'Digite o PIN para entrar.'}</p>
-      <input id="pin-input" type="password" inputmode="numeric" class="pin-input" data-enter="pinSubmit" placeholder="${isNew ? 'Novo PIN (mín. 4 dígitos)' : 'PIN'}" autofocus />
-      ${isNew ? `<input id="pin-confirm-input" type="password" inputmode="numeric" class="pin-input" data-enter="pinSubmit" placeholder="Confirmar PIN" />` : ''}
-      ${state.pinGateError ? `<p class="error-text">${escapeHtml(state.pinGateError)}</p>` : ''}
-      <button class="btn btn-primary" style="width:100%;justify-content:center;margin-top:8px;" data-action="pin-submit">${isNew ? 'Criar PIN e entrar' : 'Entrar'}</button>
-      <button class="btn" style="width:100%;justify-content:center;margin-top:8px;border-color:transparent;background:none;" data-action="exit-financeiro">Voltar ao caixa</button>
+  <div style="max-width:440px;" class="card">
+    <h2 style="font-size:14px;font-weight:600;margin:0 0 4px;">Retirada de valores</h2>
+    <p style="font-size:12px;color:var(--ink-soft);margin:0 0 14px;">Registre sempre que tirar dinheiro do caixa (sangria), para o fechamento bater certinho.</p>
+    ${fieldHTML({ id: 'wd-amount', label: 'Valor retirado (R$)', placeholder: '0,00', mono: true, enter: 'submitWithdrawal' })}
+    ${fieldHTML({ id: 'wd-reason', label: 'Motivo (opcional)', placeholder: 'Ex: troco para o banco, depósito…', enter: 'submitWithdrawal' })}
+    ${state.withdrawalError ? `<p class="error-text">${escapeHtml(state.withdrawalError)}</p>` : ''}
+    <button class="btn btn-primary" data-action="submit-withdrawal">Registrar retirada</button>
+    ${state.withdrawalSuccess ? `<span class="flash" style="color:var(--primary-dark);">${icon('check', 13)} Retirada de ${brl(state.withdrawalSuccess.amount)} registrada</span>` : ''}
+    ${periodWithdrawalsList()}
+  </div>`;
+}
+
+function caixaFecharHTML() {
+  if (state.lastClosureResult) return closureResultHTML(state.lastClosureResult);
+  const pt = periodTotals();
+  return `
+  <div style="max-width:480px;" class="card">
+    <h2 style="font-size:14px;font-weight:600;margin:0 0 4px;">Fechar caixa</h2>
+    <p style="font-size:12px;color:var(--ink-soft);margin:0 0 14px;">Confira os valores esperados do turno e informe quanto tem de dinheiro fisicamente no caixa.</p>
+    <div class="stack" style="gap:2px;margin-bottom:14px;">
+      <div class="kv-row"><span>Vendas no turno</span><span class="mono">${pt.salesCount}</span></div>
+      <div class="kv-row"><span>Dinheiro (vendas)</span><span class="mono">${brl(pt.totals.dinheiro)}</span></div>
+      <div class="kv-row"><span>Retiradas</span><span class="mono">- ${brl(pt.retiradas)}</span></div>
+      <div class="kv-row total"><span>Dinheiro esperado no caixa</span><span class="mono">${brl(pt.expectedCash)}</span></div>
+      <div class="kv-row" style="margin-top:8px;"><span style="color:var(--cartao);">Cartão (vendas)</span><span class="mono">${brl(pt.totals.cartao)}</span></div>
+      <div class="kv-row"><span style="color:var(--pix);">Pix (vendas)</span><span class="mono">${brl(pt.totals.pix)}</span></div>
+    </div>
+    ${fieldHTML({ id: 'close-informed', label: 'Valor em dinheiro contado no caixa', placeholder: '0,00', mono: true, enter: 'submitCashClosure' })}
+    ${state.closureError ? `<p class="error-text">${escapeHtml(state.closureError)}</p>` : ''}
+    <button class="btn btn-primary" data-action="submit-cash-closure">Confirmar fechamento</button>
+  </div>`;
+}
+
+function closureResultHTML(c) {
+  const diffColor = c.difference === 0 ? 'var(--primary-dark)' : (c.difference > 0 ? 'var(--gold)' : 'var(--danger)');
+  const diffLabel = c.difference === 0 ? 'Confere certinho' : (c.difference > 0 ? 'Sobra' : 'Falta');
+  return `
+  <div id="print-area" style="max-width:520px;" class="card">
+    <h2 style="font-size:15px;font-weight:700;margin:0 0 2px;">Fechamento de caixa</h2>
+    <p style="font-size:12px;color:var(--ink-soft);margin:0 0 14px;">${new Date(c.datetime).toLocaleString('pt-BR')}${c.operator ? ' · fechado por ' + escapeHtml(c.operator) : ''}</p>
+    <div class="stack" style="gap:2px;">
+      <div class="kv-row"><span>Vendas no turno</span><span class="mono">${c.salesCount}</span></div>
+      <div class="kv-row"><span>Dinheiro (vendas)</span><span class="mono">${brl(c.totalDinheiro)}</span></div>
+      <div class="kv-row"><span>Cartão (vendas)</span><span class="mono">${brl(c.totalCartao)}</span></div>
+      <div class="kv-row"><span>Pix (vendas)</span><span class="mono">${brl(c.totalPix)}</span></div>
+      <div class="kv-row total"><span>Total geral</span><span class="mono">${brl(c.totalGeral)}</span></div>
+      <div class="kv-row" style="margin-top:8px;"><span>Retiradas</span><span class="mono">- ${brl(c.retiradas)}</span></div>
+      <div class="kv-row"><span>Dinheiro esperado</span><span class="mono">${brl(c.expectedCash)}</span></div>
+      <div class="kv-row"><span>Dinheiro contado</span><span class="mono">${brl(c.informedCash)}</span></div>
+      <div class="kv-row total" style="color:${diffColor};"><span>${diffLabel}</span><span class="mono">${brl(Math.abs(c.difference))}</span></div>
+    </div>
+    <div class="no-print" style="display:flex;gap:8px;margin-top:18px;">
+      <button class="btn" data-action="print-page">Imprimir</button>
+      <button class="btn btn-primary" style="flex:1;justify-content:center;" data-action="conclude-closure">Concluir e voltar às vendas</button>
+    </div>
+  </div>`;
+}
+
+function caixaSituacaoHTML() {
+  const pt = periodTotals();
+  return `
+  <div id="print-area" style="max-width:480px;" class="card">
+    <h2 style="font-size:15px;font-weight:700;margin:0 0 2px;">Situação do caixa agora</h2>
+    <p style="font-size:12px;color:var(--ink-soft);margin:0 0 14px;">${new Date().toLocaleString('pt-BR')}</p>
+    <div class="stack" style="gap:2px;">
+      <div class="kv-row"><span>Vendas no turno</span><span class="mono">${pt.salesCount}</span></div>
+      <div class="kv-row"><span>Dinheiro (vendas)</span><span class="mono">${brl(pt.totals.dinheiro)}</span></div>
+      <div class="kv-row"><span>Cartão (vendas)</span><span class="mono">${brl(pt.totals.cartao)}</span></div>
+      <div class="kv-row"><span>Pix (vendas)</span><span class="mono">${brl(pt.totals.pix)}</span></div>
+      <div class="kv-row total"><span>Total geral</span><span class="mono">${brl(pt.totalGeral)}</span></div>
+      <div class="kv-row" style="margin-top:8px;"><span>Retiradas</span><span class="mono">- ${brl(pt.retiradas)}</span></div>
+      <div class="kv-row total"><span>Dinheiro esperado no caixa</span><span class="mono">${brl(pt.expectedCash)}</span></div>
+    </div>
+    <button class="btn no-print" style="margin-top:18px;" data-action="print-page">Imprimir</button>
+  </div>`;
+}
+
+function roleSelectHTML() {
+  return `
+  <div style="max-width:400px;margin:64px auto 0;text-align:center;">
+    <div class="brand-icon" style="width:52px;height:52px;margin:0 auto 16px;">${icon('scan', 24, '#fff')}</div>
+    <h2 style="font-size:19px;font-weight:700;margin:0 0 6px;">${escapeHtml(state.storeName)}</h2>
+    <p style="font-size:13px;color:var(--ink-soft);margin:0 0 22px;">Olá, ${escapeHtml(state.currentUser?.name || '')}! Onde você vai trabalhar agora?</p>
+    <div class="stack">
+      <button class="btn btn-primary" style="justify-content:center;padding:14px;font-size:14px;" data-action="choose-area" data-area="caixa">${icon('cart', 17)} Caixa</button>
+      <button class="btn" style="justify-content:center;padding:14px;font-size:14px;" data-action="choose-area" data-area="financeiro">${icon('lock', 17)} Financeiro</button>
+    </div>
+    <button class="btn" style="margin-top:18px;border-color:transparent;background:none;" data-action="logout">Sair</button>
+  </div>`;
+}
+
+function bootstrapHTML() {
+  return `
+  <div style="max-width:400px;margin:56px auto 0;text-align:center;">
+    <div class="brand-icon" style="width:52px;height:52px;margin:0 auto 16px;">${icon('scan', 24, '#fff')}</div>
+    <h2 style="font-size:19px;font-weight:700;margin:0 0 6px;">${escapeHtml(state.storeName)}</h2>
+    <p style="font-size:13px;color:var(--ink-soft);margin:0 0 20px;">Vamos criar o primeiro usuário do sistema. Ele terá acesso ao Caixa e ao Financeiro.</p>
+    <div class="card" style="text-align:left;">
+      ${fieldHTML({ id: 'bs-name', label: 'Seu nome', placeholder: 'Ex: Maria', enter: 'submitBootstrap' })}
+      ${fieldHTML({ id: 'bs-pass', label: 'Senha', type: 'password', enter: 'submitBootstrap' })}
+      ${fieldHTML({ id: 'bs-pass2', label: 'Confirmar senha', type: 'password', enter: 'submitBootstrap' })}
+      ${state.loginError ? `<p class="error-text">${escapeHtml(state.loginError)}</p>` : ''}
+      <button class="btn btn-primary" style="width:100%;justify-content:center;" data-action="submit-bootstrap">Criar usuário e entrar</button>
+    </div>
+  </div>`;
+}
+
+function loginHTML() {
+  return `
+  <div style="max-width:380px;margin:56px auto 0;text-align:center;">
+    <div class="brand-icon" style="width:52px;height:52px;margin:0 auto 16px;">${icon('scan', 24, '#fff')}</div>
+    <h2 style="font-size:19px;font-weight:700;margin:0 0 6px;">${escapeHtml(state.storeName)}</h2>
+    <p style="font-size:13px;color:var(--ink-soft);margin:0 0 20px;">Entre com seu usuário para continuar.</p>
+    <div class="card" style="text-align:left;">
+      <div class="field">
+        <label class="field-label">Usuário</label>
+        <div class="input-wrap">
+          <select id="login-user" style="width:100%;background:transparent;border:none;outline:none;font-size:14px;padding:2px 0;">
+            ${state.users.map(u => `<option value="${u.id}">${escapeHtml(u.name)}</option>`).join('')}
+          </select>
+        </div>
+      </div>
+      ${fieldHTML({ id: 'login-pass', label: 'Senha', type: 'password', enter: 'submitLogin' })}
+      ${state.loginError ? `<p class="error-text">${escapeHtml(state.loginError)}</p>` : ''}
+      <button class="btn btn-primary" style="width:100%;justify-content:center;" data-action="submit-login">Entrar</button>
     </div>
   </div>`;
 }
@@ -698,7 +989,7 @@ function relatorioHTML() {
         return `<div class="sale-row">
           <div style="min-width:0;">
             <div style="font-size:13px;font-weight:500;">${new Date(s.datetime).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</div>
-            <div style="font-size:11.5px;color:var(--ink-soft);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${s.items.length} item(ns) · ${s.items.map(i => escapeHtml(i.name)).join(', ')}</div>
+            <div style="font-size:11.5px;color:var(--ink-soft);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${s.items.length} item(ns) · ${s.items.map(i => escapeHtml(i.name)).join(', ')}${s.operator ? ' · ' + escapeHtml(s.operator) : ''}</div>
           </div>
           <div style="display:flex;align-items:center;gap:10px;flex-shrink:0;">
             <span class="pay-chip" style="background:${p.hex}1A;color:${p.hex};">${icon(p.icon, 11)} ${p.label}</span>
@@ -712,8 +1003,9 @@ function relatorioHTML() {
 
 function configHTML() {
   const cfg = state.pixConfig;
+  const editingUser = state.editingUserId ? state.users.find(u => u.id === state.editingUserId) : null;
   return `
-  <div style="max-width:560px;" class="stack">
+  <div style="max-width:620px;" class="stack">
     <div class="card">
       <h2 style="font-size:14px;font-weight:600;margin:0 0 2px;display:flex;align-items:center;gap:6px;">${icon('qr', 15, 'var(--pix)')} Chave Pix para recebimento</h2>
       <p style="font-size:12px;color:var(--ink-soft);margin:0 0 12px;">Usada para gerar o QR Code no caixa. Só quem acessa a área financeira pode ver ou alterar essa chave.</p>
@@ -727,16 +1019,43 @@ function configHTML() {
     </div>
 
     <div class="card">
-      <h2 style="font-size:14px;font-weight:600;margin:0 0 2px;display:flex;align-items:center;gap:6px;">${icon('key', 15, 'var(--primary-dark)')} PIN de acesso ao financeiro</h2>
-      <p style="font-size:12px;color:var(--ink-soft);margin:0 0 12px;">Esse PIN protege produtos, relatório e a chave Pix contra acesso pelo caixa.</p>
-      ${fieldHTML({ id: 'pin-old', label: 'PIN atual', type: 'password' })}
-      <div class="row">
-        ${fieldHTML({ id: 'pin-new', label: 'Novo PIN', type: 'password' })}
-        ${fieldHTML({ id: 'pin-new2', label: 'Confirmar novo PIN', type: 'password' })}
+      <h2 style="font-size:14px;font-weight:600;margin:0 0 2px;display:flex;align-items:center;gap:6px;">${icon('key', 15, 'var(--primary-dark)')} Usuários</h2>
+      <p style="font-size:12px;color:var(--ink-soft);margin:0 0 12px;">Cada pessoa tem seu próprio usuário e senha. O papel decide o que ela pode acessar.</p>
+
+      ${state.users.length > 0 ? `<div style="margin-bottom:16px;">
+        ${state.users.map(u => `
+          <div class="prod-row">
+            <div>
+              <div style="font-size:13.5px;font-weight:500;">${escapeHtml(u.name)}</div>
+              <div style="font-size:11.5px;color:var(--ink-soft);">${u.role === 'caixa' ? 'Caixa' : (u.role === 'financeiro' ? 'Financeiro' : 'Caixa e Financeiro')}</div>
+            </div>
+            <div style="display:flex;align-items:center;gap:14px;">
+              <button class="icon-btn" data-action="edit-user" data-id="${u.id}" style="color:var(--primary-dark);">${icon('pencil', 14)}</button>
+              ${state.users.length > 1 ? `<button class="icon-btn" data-action="remove-user" data-id="${u.id}" style="color:var(--danger);">${icon('trash', 14)}</button>` : ''}
+            </div>
+          </div>`).join('')}
+      </div>` : ''}
+
+      <h3 style="font-size:13px;font-weight:600;margin:0 0 8px;">${editingUser ? 'Editar usuário' : 'Novo usuário'}</h3>
+      ${fieldHTML({ id: 'uf-name', label: 'Nome', value: editingUser?.name || '', placeholder: 'Nome da pessoa', enter: 'submitUserForm' })}
+      <div class="field">
+        <label class="field-label">Papel</label>
+        <div class="input-wrap">
+          <select id="uf-role" style="width:100%;background:transparent;border:none;outline:none;font-size:14px;padding:2px 0;">
+            <option value="caixa" ${editingUser?.role === 'caixa' ? 'selected' : ''}>Caixa</option>
+            <option value="financeiro" ${editingUser?.role === 'financeiro' ? 'selected' : ''}>Financeiro</option>
+            <option value="ambos" ${editingUser?.role === 'ambos' ? 'selected' : ''}>Caixa e Financeiro</option>
+          </select>
+        </div>
       </div>
-      ${state.pinChangeError ? `<p class="error-text">${escapeHtml(state.pinChangeError)}</p>` : ''}
-      <button class="btn" data-action="change-pin-btn">Alterar PIN</button>
-      ${state.pinSaved ? `<span class="flash" style="color:var(--primary-dark);">${icon('check', 13)} PIN alterado</span>` : ''}
+      ${fieldHTML({ id: 'uf-pass', label: editingUser ? 'Nova senha (deixe em branco para manter)' : 'Senha', type: 'password', enter: 'submitUserForm' })}
+      ${fieldHTML({ id: 'uf-pass2', label: 'Confirmar senha', type: 'password', enter: 'submitUserForm' })}
+      ${state.userFormError ? `<p class="error-text">${escapeHtml(state.userFormError)}</p>` : ''}
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-primary" style="flex:1;justify-content:center;" data-action="submit-user-form">${editingUser ? 'Salvar alterações' : 'Criar usuário'}</button>
+        ${editingUser ? `<button class="btn" data-action="reset-user-form">${icon('x', 15)}</button>` : ''}
+      </div>
+      ${state.userSaved ? `<span class="flash" style="color:var(--primary-dark);">${icon('check', 13)} Salvo</span>` : ''}
     </div>
   </div>`;
 }
@@ -745,14 +1064,22 @@ function buildHTML() {
   if (state.loading) {
     return `<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;"><div style="display:flex;align-items:center;gap:8px;font-size:14px;color:var(--ink-soft);">${icon('scan', 18)} Carregando o caixa…</div></div>`;
   }
+  if (state.users.length === 0) {
+    return `<main>${bootstrapHTML()}</main>`;
+  }
+  if (!state.currentUser) {
+    return `<main>${loginHTML()}</main>`;
+  }
+  if (!state.area) {
+    return `<main>${roleSelectHTML()}</main>`;
+  }
   let mainContent = '';
   if (state.area === 'caixa') {
     mainContent = caixaHTML();
-  } else if (state.area === 'financeiro' && !state.unlocked) {
-    mainContent = pinGateHTML();
-  } else if (state.area === 'financeiro' && state.unlocked) {
+  } else if (state.area === 'financeiro') {
     if (state.tab === 'produtos') mainContent = produtosHTML();
     else if (state.tab === 'relatorio') mainContent = relatorioHTML();
+    else if (state.tab === 'situacao') mainContent = caixaSituacaoHTML();
     else if (state.tab === 'config') mainContent = configHTML();
   }
   return `${headerHTML()}<main>${mainContent}</main>`;
@@ -770,8 +1097,12 @@ const ENTER_ACTIONS = {
     render();
   },
   submitProductForm: () => submitProductForm(),
-  pinSubmit: () => pinSubmit(),
   savePixConfig: () => savePixConfigHandler(),
+  submitWithdrawal: () => submitWithdrawal(),
+  submitCashClosure: () => submitCashClosure(),
+  submitBootstrap: () => submitBootstrap(),
+  submitLogin: () => submitLogin(),
+  submitUserForm: () => submitUserForm(),
 };
 
 root.addEventListener('click', (e) => {
@@ -779,9 +1110,15 @@ root.addEventListener('click', (e) => {
   if (!t) return;
   const action = t.dataset.action;
   if (action === 'toggle-edit-name') { state.editingName = true; render(); focusById('name-input'); }
-  else if (action === 'enter-financeiro') enterFinanceiro();
-  else if (action === 'exit-financeiro') exitFinanceiro();
-  else if (action === 'set-tab') { state.tab = t.dataset.tab; render(); }
+  else if (action === 'toggle-nav-menu') { state.navMenuOpen = !state.navMenuOpen; render(); }
+  else if (action === 'submit-bootstrap') submitBootstrap();
+  else if (action === 'submit-login') submitLogin();
+  else if (action === 'logout') logout();
+  else if (action === 'choose-area') { state.area = t.dataset.area; if (state.area === 'caixa') state.caixaTab = 'venda'; else state.tab = 'produtos'; render(); }
+  else if (action === 'go-financeiro') { state.area = 'financeiro'; state.tab = 'produtos'; state.navMenuOpen = false; render(); }
+  else if (action === 'go-caixa') { state.area = 'caixa'; state.caixaTab = 'venda'; state.navMenuOpen = false; render(); }
+  else if (action === 'set-caixa-tab') { state.caixaTab = t.dataset.tab; state.navMenuOpen = false; render(); }
+  else if (action === 'set-tab') { state.tab = t.dataset.tab; state.navMenuOpen = false; render(); }
   else if (action === 'add-to-cart') { const p = state.products.find(pr => pr.barcode === t.dataset.barcode); addToCart(p, 1); render(); }
   else if (action === 'change-qty') { changeQty(t.dataset.barcode, parseInt(t.dataset.delta, 10)); render(); }
   else if (action === 'remove-item') { removeItem(t.dataset.barcode); render(); }
@@ -792,9 +1129,15 @@ root.addEventListener('click', (e) => {
   else if (action === 'remove-product') removeProductHandler(t.dataset.id);
   else if (action === 'reset-product-form') resetProductForm();
   else if (action === 'submit-product-form') submitProductForm();
-  else if (action === 'pin-submit') pinSubmit();
   else if (action === 'save-pix-config') savePixConfigHandler();
-  else if (action === 'change-pin-btn') changePinHandler();
+  else if (action === 'edit-user') editUser(t.dataset.id);
+  else if (action === 'remove-user') removeUserHandler(t.dataset.id);
+  else if (action === 'reset-user-form') resetUserForm();
+  else if (action === 'submit-user-form') submitUserForm();
+  else if (action === 'submit-withdrawal') submitWithdrawal();
+  else if (action === 'submit-cash-closure') submitCashClosure();
+  else if (action === 'conclude-closure') { state.lastClosureResult = null; state.caixaTab = 'venda'; render(); }
+  else if (action === 'print-page') window.print();
 });
 
 root.addEventListener('keydown', (e) => {
@@ -811,9 +1154,6 @@ root.addEventListener('input', (e) => {
   else if (id === 'catalog-search') { state.catalogSearch = e.target.value; render(); }
   else if (id === 'produtos-search') { state.produtosSearch = e.target.value; render(); }
   else if (id === 'received-input') { state.receivedStr = e.target.value; render(); }
-  else if (id === 'pin-input' || id === 'pin-confirm-input' || id === 'pin-old' || id === 'pin-new' || id === 'pin-new2') {
-    e.target.value = e.target.value.replace(/\D/g, '');
-  }
 });
 
 root.addEventListener('blur', (e) => {
