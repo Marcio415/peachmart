@@ -226,6 +226,7 @@ const state = {
   pixConfig: { key: '', name: '', city: '' },
   users: [],
   currentUser: null,     // { id, name, role } — sessão atual (não persistido)
+  currentCaixa: null,    // { id, datetime, total, received, change, items } — caixa aberto (não persistido)
   loginError: '',
   area: null,            // null (a decidir) | 'caixa' | 'financeiro'
   tab: 'produtos',       // aba dentro do financeiro
@@ -486,7 +487,9 @@ async function finalizeSale() {
   const total = computeTotal();
   const receivedNum = state.payment === 'dinheiro' ? parseFloat((state.receivedStr || '0').replace(',', '.')) : undefined;
   const troco = state.payment === 'dinheiro' ? receivedNum - total : undefined;
-  const sale = { id: uid(), datetime: new Date().toISOString(), items: state.cart.map((i) => ({ ...i })), total, payment: state.payment, received: receivedNum, troco, operator: state.currentUser?.name || null };
+  console.log('CAIXA ATUAL NA VENDA:', state.currentCaixaId);
+  const sale = { id: uid(), datetime: new Date().toISOString(), items: state.cart.map((i) => ({ ...i })), total, payment: state.payment, received: receivedNum, troco, operator: state.currentUser?.name || null, caixa_id: state.currentCaixaId};
+  console.log('VENDA ANTES DE SALVAR:', sale);
   const { error } = await supabaseClient
   .from('vendas')
   .insert([sale]);
@@ -543,12 +546,12 @@ function copyPixCode() {
 // ---------------------------------------------------------------------------
 function lastClosureDatetime() { return state.cashClosures.length ? state.cashClosures[0].datetime : null; }
 function periodSales() {
-  const since = lastClosureDatetime();
-  return state.sales.filter((s) => !since || new Date(s.datetime) > new Date(since));
+  if (!state.currentCaixaId) return [];
+  return state.sales.filter((s) => s.caixa_id === state.currentCaixaId);
 }
 function periodWithdrawals() {
-  const since = lastClosureDatetime();
-  return state.withdrawals.filter((w) => !since || new Date(w.datetime) > new Date(since));
+  if (!state.currentCaixaId) return [];
+  return state.withdrawals.filter((w) => w.caixa_id === state.currentCaixaId);
 }
 function periodTotals() {
   const sales = periodSales();
@@ -564,7 +567,7 @@ function submitWithdrawal() {
   const reason = (document.getElementById('wd-reason') || {}).value || '';
   const amount = parseFloat(amountRaw.replace(',', '.'));
   if (isNaN(amount) || amount <= 0) { state.withdrawalError = 'Informe um valor válido.'; render(); return; }
-  const w = { id: uid(), datetime: new Date().toISOString(), amount, reason: reason.trim(), operator: state.currentUser?.name || null };
+  const w = { id: uid(), datetime: new Date().toISOString(), amount, reason: reason.trim(), operator: state.currentUser?.name || null, caixa_id: state.currentCaixaId };
   saveWithdrawals([w, ...state.withdrawals]);
   state.withdrawalSuccess = w;
   state.withdrawalError = '';
@@ -589,10 +592,26 @@ async function submitCashClosure() {
     informedCash,
     difference: informedCash - pt.expectedCash,
     operator: state.currentUser?.name || null,
+    caixa_id: state.currentCaixaId
   };
   await saveCashClosures([closure, ...state.cashClosures]);
-  state.closureError = '';
-  state.lastClosureResult = closure;
+  if (state.currentCaixaId) {
+  const { error } = await supabaseClient
+    .from('caixas')
+    .update({
+      status: 'fechado',
+      closed_at: new Date().toISOString()
+    })
+    .eq('id', state.currentCaixaId);
+
+  if (error) {
+    console.error('Erro ao fechar caixa:', error);
+    alert('Erro ao fechar caixa no Supabase: ' + error.message);
+    return;
+  }
+}
+state.closureError = '';
+state.lastClosureResult = closure;
   render();
 }
  
@@ -621,13 +640,53 @@ state.currentUser = {
   state.area = null;
   render();
 }
-function submitLogin() {
+async function submitLogin() {
   const userId = (document.getElementById('login-user') || {}).value || '';
   const pass = (document.getElementById('login-pass') || {}).value || '';
-  const user = state.users.find((u) => u.id === userId);
+  const user = state.users.find((u) => String(u.id) === String(userId));
+  console.log('usuario do login:', user);
   if (!user || user.password !== pass) { state.loginError = 'Usuário ou senha incorretos.'; render(); return; }
-  state.currentUser = { id: user.id, name: user.name, role: user.role };
+  state.currentUser = { id: user.id, name: user.name, role: user.role, empresa_id: user.empresa_id };
   state.loginError = '';
+  if (user.role === 'caixa' || user.role === 'ambos') {
+  const { data: caixaAberto, error: caixaError } = await supabaseClient
+    .from('caixas')
+    .select('*')
+    .eq('empresa_id', user.empresa_id)
+    .eq('status', 'aberto')
+    .order('opened_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (caixaError) {
+    console.error('Erro ao verificar caixa aberto:', caixaError);
+    alert('Erro ao verificar caixa no Supabase: ' + caixaError.message);
+    return;
+  }
+
+  if (caixaAberto) {
+    state.currentCaixaId = caixaAberto.id;
+  } else {
+    const { data, error } = await supabaseClient
+      .from('caixas')
+      .insert([{
+        empresa_id: user.empresa_id,
+        operator: user.name,
+        status: 'aberto',
+        opening_cash: 0
+      }])
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Erro ao abrir caixa:', error);
+      alert('Erro ao abrir caixa no Supabase: ' + error.message);
+      return;
+    }
+
+    state.currentCaixaId = data.id;
+  }
+}
   if (user.role === 'caixa') { state.area = 'caixa'; state.caixaTab = 'venda'; }
   else if (user.role === 'financeiro') { state.area = 'financeiro'; state.tab = 'produtos'; }
   else { state.area = null; }
@@ -700,7 +759,7 @@ async function submitProductForm() {
   }
 
   const dup = state.products.find(
-    (p) => p.barcode === barcode && p.id !== state.editingProductId
+    (p) => p.barcode === barcode && String(p.id) !== String(state.editingProductId)
   );
 
   if (dup) {
@@ -730,7 +789,7 @@ async function submitProductForm() {
       if (error) throw error;
 
       state.products = state.products.map((p) =>
-        p.id === state.editingProductId ? data : p
+        String(p.id) === String(state.editingProductId) ? data : p
       );
 
     } else {
@@ -1125,7 +1184,7 @@ function fieldHTML({ id, label, value = '', placeholder = '', mono = false, type
 }
  
 function produtosHTML() {
-  const editing = state.editingProductId ? state.products.find(p => p.id === state.editingProductId) : null;
+  const editing = state.editingProductId ? state.products.find(p => String(p.id) === String(state.editingProductId)) : null;
   const search = state.produtosSearch;
   const filtered = state.products.filter(p => p.name.toLowerCase().includes(search.toLowerCase()) || p.barcode.includes(search));
   const lowStock = state.products.filter(p => p.stock <= 5);
@@ -1396,7 +1455,30 @@ root.addEventListener('click', async (e) => {
   else if (action === 'submit-user-form') submitUserForm();
   else if (action === 'submit-withdrawal') submitWithdrawal();
   else if (action === 'submit-cash-closure') submitCashClosure();
-  else if (action === 'conclude-closure') { state.lastClosureResult = null; state.caixaTab = 'venda'; render(); }
+  else if (action === 'conclude-closure') {
+  state.lastClosureResult = null;
+
+  const { data, error } = await supabaseClient
+    .from('caixas')
+    .insert([{
+      empresa_id: state.currentUser?.empresa_id,
+      operator: state.currentUser?.name || null,
+      status: 'aberto',
+      opening_cash: 0
+    }])
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Erro ao abrir novo caixa:', error);
+    alert('Erro ao abrir novo caixa no Supabase: ' + error.message);
+    return;
+  }
+
+  state.currentCaixaId = data.id;
+  state.caixaTab = 'venda';
+  render();
+}
   else if (action === 'print-page') window.print();
 });
  
