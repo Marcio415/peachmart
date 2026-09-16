@@ -116,6 +116,15 @@
 <body>
 <div id="root" class="app"></div>
  
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<script>
+  const SUPABASE_URL = "https://qsnyoetixvcvyoyjtzcq.supabase.co";
+  const SUPABASE_KEY = "sb_publishable_ycrwoud0TKGGWgcs4sSdeQ_HQV1zdu1";
+
+  const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  console.log("Supabase conectado!");
+</script>
 <script>
 // ---------------------------------------------------------------------------
 // Logo do app (embutido em base64, para o arquivo funcionar sozinho)
@@ -217,6 +226,8 @@ const state = {
   pixConfig: { key: '', name: '', city: '' },
   users: [],
   currentUser: null,     // { id, name, role } — sessão atual (não persistido)
+  currentCaixa: null,    // caixa aberto (não persistido)
+  currentCaixaId: null,   // ID do caixa aberto da empresa/sessão
   loginError: '',
   area: null,            // null (a decidir) | 'caixa' | 'financeiro'
   tab: 'produtos',       // aba dentro do financeiro
@@ -286,31 +297,214 @@ function render() {
 }
 function focusById(id) { const el = document.getElementById(id); if (el) el.focus(); }
  
-// ---------------------------------------------------------------------------
+
 // Persistência
 // ---------------------------------------------------------------------------
 async function loadData() {
-  try { const r = await storageGet('products'); state.products = r ? JSON.parse(r.value) : []; } catch (e) { state.products = []; }
-  try { const r = await storageGet('sales'); state.sales = r ? JSON.parse(r.value) : []; } catch (e) { state.sales = []; }
-  try { const r = await storageGet('withdrawals'); state.withdrawals = r ? JSON.parse(r.value) : []; } catch (e) { state.withdrawals = []; }
-  try { const r = await storageGet('cash_closures'); state.cashClosures = r ? JSON.parse(r.value) : []; } catch (e) { state.cashClosures = []; }
+  // No carregamento inicial ainda não existe usuário logado.
+  // Carregamos somente os usuários para permitir o login.
+  try {
+    const { data, error } = await supabaseClient
+      .from('usuarios')
+      .select('*');
+
+    if (error) throw error;
+
+    state.users = data || [];
+  } catch (e) {
+    console.error('Erro ao carregar usuários:', e);
+    state.users = [];
+  }
+
   try {
     const r = await storageGet('store_name');
     state.storeName = (r && r.value && r.value !== 'Meu Mercado') ? r.value : 'Peachmart';
-  } catch (e) { state.storeName = 'Peachmart'; }
-  try { const r = await storageGet('pix_config'); if (r) state.pixConfig = JSON.parse(r.value); } catch (e) {}
-  try { const r = await storageGet('users'); state.users = r ? JSON.parse(r.value) : []; } catch (e) { state.users = []; }
+  } catch (e) {
+    state.storeName = 'Peachmart';
+  }
+
+  try {
+    const r = await storageGet('pix_config');
+    if (r) state.pixConfig = JSON.parse(r.value);
+  } catch (e) {}
+
   state.loading = false;
   render();
 }
+
+async function loadCompanyData(empresaId) {
+  if (!empresaId) {
+    console.error('Usuário sem empresa_id. Não foi possível carregar os dados da empresa.');
+    state.products = [];
+    state.sales = [];
+    state.withdrawals = [];
+    state.cashClosures = [];
+    return false;
+  }
+
+  try {
+    const { data, error } = await supabaseClient
+      .from('produtos')
+      .select('*')
+      .eq('empresa_id', empresaId);
+
+    if (error) throw error;
+    state.products = data || [];
+  } catch (e) {
+    console.error('Erro ao carregar produtos da empresa:', e);
+    state.products = [];
+  }
+
+  try {
+    const { data, error } = await supabaseClient
+      .from('vendas')
+      .select('*')
+      .eq('empresa_id', empresaId)
+      .order('datetime', { ascending: false });
+
+    if (error) throw error;
+    console.log('VENDAS DA EMPRESA:', data);
+    state.sales = data || [];
+  } catch (e) {
+    console.error('Erro ao carregar vendas da empresa:', e);
+    state.sales = [];
+  }
+
+  try {
+    const { data, error } = await supabaseClient
+      .from('retiradas')
+      .select('*')
+      .eq('empresa_id', empresaId)
+      .order('datetime', { ascending: false });
+
+    if (error) throw error;
+    state.withdrawals = data || [];
+  } catch (e) {
+    console.error('Erro ao carregar retiradas da empresa:', e);
+    state.withdrawals = [];
+  }
+
+  try {
+    const { data, error } = await supabaseClient
+      .from('fechamentos')
+      .select('*')
+      .eq('empresa_id', empresaId)
+      .order('datetime', { ascending: false });
+
+    if (error) throw error;
+    state.cashClosures = data || [];
+    console.log('FECHAMENTOS DA EMPRESA:', state.cashClosures);
+  } catch (e) {
+    console.error('Erro ao carregar fechamentos da empresa:', e);
+    state.cashClosures = [];
+  }
+
+  return true;
+}
+
+async function ensureOpenCaixa() {
+  const empresaId = state.currentUser?.empresa_id;
+  if (!empresaId) {
+    state.currentCaixaId = null;
+    return false;
+  }
+
+  const { data: caixaAberto, error: caixaError } = await supabaseClient
+    .from('caixas')
+    .select('*')
+    .eq('empresa_id', empresaId)
+    .eq('status', 'aberto')
+    .order('opened_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (caixaError) {
+    console.error('Erro ao verificar caixa aberto:', caixaError);
+    alert('Erro ao verificar caixa no Supabase: ' + caixaError.message);
+    return false;
+  }
+
+  if (caixaAberto) {
+    state.currentCaixaId = caixaAberto.id;
+    return true;
+  }
+
+  const { data, error } = await supabaseClient
+    .from('caixas')
+    .insert([{
+      empresa_id: empresaId,
+      operator: state.currentUser?.name || null,
+      status: 'aberto',
+      opening_cash: 0
+    }])
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Erro ao abrir caixa:', error);
+    alert('Erro ao abrir caixa no Supabase: ' + error.message);
+    state.currentCaixaId = null;
+    return false;
+  }
+
+  state.currentCaixaId = data.id;
+  return true;
+}
+
 function saveProducts(list) { state.products = list; storageSet('products', JSON.stringify(list)); }
 function saveSales(list) { state.sales = list; storageSet('sales', JSON.stringify(list)); }
-function saveWithdrawals(list) { state.withdrawals = list; storageSet('withdrawals', JSON.stringify(list)); }
-function saveCashClosures(list) { state.cashClosures = list; storageSet('cash_closures', JSON.stringify(list)); }
+async function saveWithdrawals(list) {
+  const retirada = list[0];
+
+  const { error } = await supabaseClient
+    .from('retiradas')
+    .insert([retirada]);
+
+  if (error) {
+    console.error('Erro ao salvar retirada:', error);
+    alert('Erro ao salvar retirada no Supabase: ' + error.message);
+    return;
+  }
+
+  state.withdrawals = list;
+}
+async function saveCashClosures(list) {
+  const fechamento = list[0];
+
+  const { error } = await supabaseClient
+    .from('fechamentos')
+    .insert([fechamento]);
+
+  if (error) {
+    console.error('Erro ao salvar fechamento:', error);
+    alert('Erro ao salvar fechamento no Supabase: ' + error.message);
+    return;
+  }
+
+  state.cashClosures = list;
+}
 function saveStoreName(name) { state.storeName = name; storageSet('store_name', name); }
 function savePixConfig(cfg) { state.pixConfig = cfg; storageSet('pix_config', JSON.stringify(cfg)); }
-function saveUsers(list) { state.users = list; storageSet('users', JSON.stringify(list)); }
- 
+async function saveUsers(list) {
+  const user = list[0];
+  if (!user) return null;
+
+  const { data, error } = await supabaseClient
+    .from('usuarios')
+    .insert([user])
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Erro ao salvar usuário:', error);
+    alert('Erro ao salvar usuário no Supabase: ' + error.message);
+    return null;
+  }
+
+  state.users = [...state.users, data];
+  return data;
+}
+
 // ---------------------------------------------------------------------------
 // Ações — Caixa
 // ---------------------------------------------------------------------------
@@ -363,18 +557,70 @@ function computeCanFinalize() {
   if (state.payment === 'pix') return !!(state.pixConfig && state.pixConfig.key);
   return true;
 }
-function finalizeSale() {
+async function finalizeSale() {
   if (!computeCanFinalize()) return;
+  if (!state.currentUser?.empresa_id) {
+    alert('Este usuário não está vinculado a uma empresa.');
+    return;
+  }
+  if (!state.currentCaixaId) {
+    alert('Nenhum caixa aberto foi encontrado. Faça login novamente.');
+    return;
+  }
+
   const total = computeTotal();
   const receivedNum = state.payment === 'dinheiro' ? parseFloat((state.receivedStr || '0').replace(',', '.')) : undefined;
   const troco = state.payment === 'dinheiro' ? receivedNum - total : undefined;
-  const sale = { id: uid(), datetime: new Date().toISOString(), items: state.cart.map((i) => ({ ...i })), total, payment: state.payment, received: receivedNum, troco, operator: state.currentUser?.name || null };
-  saveSales([sale, ...state.sales]);
+
+  console.log('CAIXA ATUAL NA VENDA:', state.currentCaixaId);
+
+  const sale = {
+    id: uid(),
+    datetime: new Date().toISOString(),
+    items: state.cart.map((i) => ({ ...i })),
+    total,
+    payment: state.payment,
+    received: receivedNum,
+    troco,
+    operator: state.currentUser?.name || null,
+    caixa_id: state.currentCaixaId,
+    empresa_id: state.currentUser.empresa_id
+  };
+  console.log('VENDA ANTES DE SALVAR:', sale);
+  const { error } = await supabaseClient
+  .from('vendas')
+  .insert([sale]);
+
+if (error) {
+  console.error('Erro ao salvar venda:', error);
+  alert('Erro ao salvar venda no Supabase: ' + error.message);
+  return;
+}
+
+state.sales = [sale, ...state.sales];
   const next = state.products.map((p) => {
     const item = state.cart.find((i) => i.barcode === p.barcode);
     return item ? { ...p, stock: Math.max(0, p.stock - item.qty) } : p;
   });
-  saveProducts(next);
+  for (const p of next) {
+  const original = state.products.find((prod) => prod.id === p.id);
+
+  if (original && original.stock !== p.stock) {
+    const { error } = await supabaseClient
+      .from('produtos')
+      .update({ stock: p.stock })
+      .eq('id', p.id)
+      .eq('empresa_id', state.currentUser.empresa_id);
+
+    if (error) {
+      console.error('Erro ao atualizar estoque:', error);
+      alert('Venda salva, mas houve erro ao atualizar o estoque: ' + error.message);
+      return;
+    }
+  }
+}
+
+state.products = next;
   state.success = sale;
   state.cart = [];
   state.payment = null;
@@ -398,35 +644,56 @@ function copyPixCode() {
 // ---------------------------------------------------------------------------
 function lastClosureDatetime() { return state.cashClosures.length ? state.cashClosures[0].datetime : null; }
 function periodSales() {
-  const since = lastClosureDatetime();
-  return state.sales.filter((s) => !since || new Date(s.datetime) > new Date(since));
+  if (!state.currentCaixaId) return [];
+  return state.sales.filter((s) =>
+    String(s.caixa_id) === String(state.currentCaixaId) &&
+    (!state.currentUser?.empresa_id || String(s.empresa_id) === String(state.currentUser.empresa_id))
+  );
 }
 function periodWithdrawals() {
-  const since = lastClosureDatetime();
-  return state.withdrawals.filter((w) => !since || new Date(w.datetime) > new Date(since));
+  if (!state.currentCaixaId) return [];
+  return state.withdrawals.filter((w) =>
+    String(w.caixa_id) === String(state.currentCaixaId) &&
+    (!state.currentUser?.empresa_id || String(w.empresa_id) === String(state.currentUser.empresa_id))
+  );
 }
 function periodTotals() {
   const sales = periodSales();
   const totals = { dinheiro: 0, cartao: 0, pix: 0 };
-  sales.forEach((s) => (totals[s.payment] += s.total));
+  sales.forEach((s) => {
+    if (totals[s.payment] !== undefined) totals[s.payment] += Number(s.total) || 0;
+  });
   const totalGeral = totals.dinheiro + totals.cartao + totals.pix;
-  const retiradas = periodWithdrawals().reduce((s, w) => s + w.amount, 0);
+  const retiradas = periodWithdrawals().reduce((s, w) => s + (Number(w.amount) || 0), 0);
   const expectedCash = totals.dinheiro - retiradas;
   return { salesCount: sales.length, totals, totalGeral, retiradas, expectedCash };
 }
-function submitWithdrawal() {
+async function submitWithdrawal() {
   const amountRaw = (document.getElementById('wd-amount') || {}).value || '';
   const reason = (document.getElementById('wd-reason') || {}).value || '';
   const amount = parseFloat(amountRaw.replace(',', '.'));
   if (isNaN(amount) || amount <= 0) { state.withdrawalError = 'Informe um valor válido.'; render(); return; }
-  const w = { id: uid(), datetime: new Date().toISOString(), amount, reason: reason.trim(), operator: state.currentUser?.name || null };
-  saveWithdrawals([w, ...state.withdrawals]);
+  if (!state.currentUser?.empresa_id || !state.currentCaixaId) {
+    state.withdrawalError = 'Nenhum caixa/empresa ativo foi encontrado.';
+    render();
+    return;
+  }
+  const w = {
+    id: uid(),
+    datetime: new Date().toISOString(),
+    amount,
+    reason: reason.trim(),
+    operator: state.currentUser?.name || null,
+    caixa_id: state.currentCaixaId,
+    empresa_id: state.currentUser.empresa_id
+  };
+  await saveWithdrawals([w, ...state.withdrawals]);
   state.withdrawalSuccess = w;
   state.withdrawalError = '';
   render();
   setTimeout(() => { if (state.withdrawalSuccess && state.withdrawalSuccess.id === w.id) { state.withdrawalSuccess = null; render(); } }, 3000);
 }
-function submitCashClosure() {
+async function submitCashClosure() {
   const informedRaw = (document.getElementById('close-informed') || {}).value || '';
   const informedCash = parseFloat(informedRaw.replace(',', '.'));
   if (isNaN(informedCash) || informedCash < 0) { state.closureError = 'Informe o valor em dinheiro contado no caixa.'; render(); return; }
@@ -444,44 +711,137 @@ function submitCashClosure() {
     informedCash,
     difference: informedCash - pt.expectedCash,
     operator: state.currentUser?.name || null,
+    caixa_id: state.currentCaixaId,
+    empresa_id: state.currentUser?.empresa_id
   };
-  saveCashClosures([closure, ...state.cashClosures]);
-  state.closureError = '';
-  state.lastClosureResult = closure;
+
+  if (!state.currentUser?.empresa_id || !state.currentCaixaId) {
+    state.closureError = 'Nenhum caixa/empresa ativo foi encontrado.';
+    render();
+    return;
+  }
+
+  await saveCashClosures([closure, ...state.cashClosures]);
+
+  if (state.currentCaixaId) {
+  const { error } = await supabaseClient
+    .from('caixas')
+    .update({
+      status: 'fechado',
+      closed_at: new Date().toISOString()
+    })
+    .eq('id', state.currentCaixaId);
+
+  if (error) {
+    console.error('Erro ao fechar caixa:', error);
+    alert('Erro ao fechar caixa no Supabase: ' + error.message);
+    return;
+  }
+}
+state.closureError = '';
+state.lastClosureResult = closure;
   render();
 }
  
 // ---------------------------------------------------------------------------
 // Ações — usuários / login
 // ---------------------------------------------------------------------------
-function submitBootstrap() {
+async function submitBootstrap() {
   const name = (document.getElementById('bs-name') || {}).value?.trim() || '';
   const pass = (document.getElementById('bs-pass') || {}).value || '';
   const pass2 = (document.getElementById('bs-pass2') || {}).value || '';
+
   if (!name) { state.loginError = 'Informe seu nome.'; render(); return; }
   if (pass.length < 4) { state.loginError = 'A senha deve ter pelo menos 4 caracteres.'; render(); return; }
   if (pass !== pass2) { state.loginError = 'As senhas não coincidem.'; render(); return; }
-  const user = { id: uid(), name, password: pass, role: 'ambos' };
-  saveUsers([user]);
-  state.currentUser = { id: user.id, name: user.name, role: user.role };
+
+  // No cadastro inicial, a empresa recebe seu próprio tenant ID.
+  const empresaId = uid();
+  const user = {
+    name,
+    password: pass,
+    role: 'ambos',
+    empresa_id: empresaId
+  };
+
+  const savedUser = await saveUsers([user]);
+  if (!savedUser) return;
+
+  state.currentUser = {
+    id: savedUser.id,
+    name: savedUser.name,
+    role: savedUser.role,
+    empresa_id: savedUser.empresa_id
+  };
+
+  await loadCompanyData(savedUser.empresa_id);
+  await ensureOpenCaixa();
+
   state.loginError = '';
   state.area = null;
   render();
 }
-function submitLogin() {
+
+async function submitLogin() {
   const userId = (document.getElementById('login-user') || {}).value || '';
   const pass = (document.getElementById('login-pass') || {}).value || '';
-  const user = state.users.find((u) => u.id === userId);
-  if (!user || user.password !== pass) { state.loginError = 'Usuário ou senha incorretos.'; render(); return; }
-  state.currentUser = { id: user.id, name: user.name, role: user.role };
+  const user = state.users.find((u) => String(u.id) === String(userId));
+
+  console.log('usuario do login:', user);
+
+  if (!user || user.password !== pass) {
+    state.loginError = 'Usuário ou senha incorretos.';
+    render();
+    return;
+  }
+
+  if (!user.empresa_id) {
+    state.loginError = 'Este usuário ainda não está vinculado a uma empresa. Cadastre o empresa_id no Supabase.';
+    render();
+    return;
+  }
+
+  state.currentUser = {
+    id: user.id,
+    name: user.name,
+    role: user.role,
+    empresa_id: user.empresa_id
+  };
+
   state.loginError = '';
-  if (user.role === 'caixa') { state.area = 'caixa'; state.caixaTab = 'venda'; }
-  else if (user.role === 'financeiro') { state.area = 'financeiro'; state.tab = 'produtos'; }
-  else { state.area = null; }
+
+  await loadCompanyData(user.empresa_id);
+
+  if (user.role === 'caixa' || user.role === 'ambos') {
+    const caixaOk = await ensureOpenCaixa();
+    if (!caixaOk) return;
+  } else {
+    state.currentCaixaId = null;
+  }
+
+  if (user.role === 'caixa') {
+    state.area = 'caixa';
+    state.caixaTab = 'venda';
+  } else if (user.role === 'financeiro') {
+    state.area = 'financeiro';
+    state.tab = 'produtos';
+  } else {
+    state.area = null;
+  }
+
   render();
 }
+
 function logout() {
   state.currentUser = null;
+  state.currentCaixaId = null;
+  state.products = [];
+  state.sales = [];
+  state.withdrawals = [];
+  state.cashClosures = [];
+  state.cart = [];
+  state.payment = null;
+  state.receivedStr = '';
   state.area = null;
   state.caixaTab = 'venda';
   state.navMenuOpen = false;
@@ -492,70 +852,247 @@ function logout() {
 // ---------------------------------------------------------------------------
 // Ações — Gestão de usuários (financeiro)
 // ---------------------------------------------------------------------------
-function submitUserForm() {
+async function submitUserForm() {
   const name = (document.getElementById('uf-name') || {}).value?.trim() || '';
   const role = (document.getElementById('uf-role') || {}).value || 'caixa';
   const pass = (document.getElementById('uf-pass') || {}).value || '';
   const pass2 = (document.getElementById('uf-pass2') || {}).value || '';
-  if (!name) { state.userFormError = 'Informe o nome.'; render(); return; }
-  const dupName = state.users.find((u) => u.name.toLowerCase() === name.toLowerCase() && u.id !== state.editingUserId);
-  if (dupName) { state.userFormError = 'Já existe um usuário com esse nome.'; render(); return; }
- 
-  if (state.editingUserId) {
-    if (pass || pass2) {
-      if (pass.length < 4) { state.userFormError = 'A senha deve ter pelo menos 4 caracteres.'; render(); return; }
-      if (pass !== pass2) { state.userFormError = 'As senhas não coincidem.'; render(); return; }
-    }
-    saveUsers(state.users.map((u) => u.id === state.editingUserId ? { ...u, name, role, password: pass ? pass : u.password } : u));
-    if (state.currentUser && state.currentUser.id === state.editingUserId) state.currentUser = { ...state.currentUser, name, role };
-  } else {
-    if (pass.length < 4) { state.userFormError = 'A senha deve ter pelo menos 4 caracteres.'; render(); return; }
-    if (pass !== pass2) { state.userFormError = 'As senhas não coincidem.'; render(); return; }
-    saveUsers([...state.users, { id: uid(), name, role, password: pass }]);
+  const empresaId = state.currentUser?.empresa_id;
+
+  if (!empresaId) {
+    state.userFormError = 'Empresa não identificada.';
+    render();
+    return;
   }
+
+  if (!name) { state.userFormError = 'Informe o nome.'; render(); return; }
+
+  const dupName = state.users.find((u) =>
+    String(u.empresa_id) === String(empresaId) &&
+    u.name.toLowerCase() === name.toLowerCase() &&
+    String(u.id) !== String(state.editingUserId)
+  );
+
+  if (dupName) {
+    state.userFormError = 'Já existe um usuário com esse nome nesta empresa.';
+    render();
+    return;
+  }
+
+  if (pass || !state.editingUserId) {
+    if (pass.length < 4) {
+      state.userFormError = 'A senha deve ter pelo menos 4 caracteres.';
+      render();
+      return;
+    }
+    if (pass !== pass2) {
+      state.userFormError = 'As senhas não coincidem.';
+      render();
+      return;
+    }
+  }
+
+  try {
+    if (state.editingUserId) {
+      const updateData = { name, role };
+      if (pass) updateData.password = pass;
+
+      const { data, error } = await supabaseClient
+        .from('usuarios')
+        .update(updateData)
+        .eq('id', state.editingUserId)
+        .eq('empresa_id', empresaId)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      state.users = state.users.map((u) =>
+        String(u.id) === String(state.editingUserId) ? data : u
+      );
+
+      if (state.currentUser && String(state.currentUser.id) === String(state.editingUserId)) {
+        state.currentUser = {
+          ...state.currentUser,
+          name: data.name,
+          role: data.role
+        };
+      }
+    } else {
+      const { data, error } = await supabaseClient
+        .from('usuarios')
+        .insert([{
+          name,
+          role,
+          password: pass,
+          empresa_id: empresaId
+        }])
+        .select()
+        .single();
+
+      if (error) throw error;
+      state.users = [...state.users, data];
+    }
+
+    state.editingUserId = null;
+    state.userFormError = '';
+    state.userSaved = true;
+    render();
+
+    setTimeout(() => {
+      state.userSaved = false;
+      render();
+    }, 2200);
+  } catch (error) {
+    console.error('Erro ao salvar usuário:', error);
+    state.userFormError = 'Erro ao salvar usuário no Supabase: ' + error.message;
+    render();
+  }
+}
+
+function resetUserForm() {
   state.editingUserId = null;
   state.userFormError = '';
-  state.userSaved = true;
   render();
-  setTimeout(() => { state.userSaved = false; render(); }, 2200);
 }
-function resetUserForm() { state.editingUserId = null; state.userFormError = ''; render(); }
-function editUser(id) { state.editingUserId = id; state.userFormError = ''; render(); focusById('uf-name'); }
-function removeUserHandler(id) {
-  if (state.users.length <= 1) return;
-  saveUsers(state.users.filter((u) => u.id !== id));
-  if (state.editingUserId === id) resetUserForm(); else render();
+
+function editUser(id) {
+  state.editingUserId = id;
+  state.userFormError = '';
+  render();
+  focusById('uf-name');
 }
- 
+
+async function removeUserHandler(id) {
+  if (state.users.filter(u => String(u.empresa_id) === String(state.currentUser?.empresa_id)).length <= 1) return;
+
+  const { error } = await supabaseClient
+    .from('usuarios')
+    .delete()
+    .eq('id', id)
+    .eq('empresa_id', state.currentUser?.empresa_id);
+
+  if (error) {
+    console.error('Erro ao excluir usuário:', error);
+    alert('Erro ao excluir usuário no Supabase: ' + error.message);
+    return;
+  }
+
+  state.users = state.users.filter((u) => String(u.id) !== String(id));
+
+  if (state.editingUserId === id) state.editingUserId = null;
+  render();
+}
+
 // ---------------------------------------------------------------------------
 // Ações — Produtos
 // ---------------------------------------------------------------------------
-function submitProductForm() {
+async function submitProductForm() {
   const barcode = (document.getElementById('pf-barcode') || {}).value?.trim() || '';
   const name = (document.getElementById('pf-name') || {}).value?.trim() || '';
   const priceRaw = (document.getElementById('pf-price') || {}).value || '';
   const stockRaw = (document.getElementById('pf-stock') || {}).value || '';
   const category = (document.getElementById('pf-category') || {}).value?.trim() || '';
+
   const price = parseFloat(priceRaw.replace(',', '.'));
   const stock = parseInt(stockRaw || '0', 10);
- 
-  if (!barcode || !name || isNaN(price) || price <= 0) { state.formError = 'Preencha código de barras, nome e um preço válido.'; render(); return; }
-  const dup = state.products.find((p) => p.barcode === barcode && p.id !== state.editingProductId);
-  if (dup) { state.formError = 'Já existe um produto com esse código de barras.'; render(); return; }
- 
-  if (state.editingProductId) {
-    saveProducts(state.products.map((p) => p.id === state.editingProductId ? { ...p, barcode, name, price, stock: isNaN(stock) ? 0 : stock, category } : p));
-  } else {
-    saveProducts([...state.products, { id: uid(), barcode, name, price, stock: isNaN(stock) ? 0 : stock, category }]);
+
+  if (!barcode || !name || isNaN(price) || price <= 0) {
+    state.formError = 'Preencha código de barras, nome e um preço válido.';
+    render();
+    return;
   }
-  resetProductForm();
+
+  const dup = state.products.find(
+    (p) => p.barcode === barcode && String(p.id) !== String(state.editingProductId)
+  );
+
+  if (dup) {
+    state.formError = 'Já existe um produto com esse código de barras.';
+    render();
+    return;
+  }
+
+  const empresaId = state.currentUser?.empresa_id;
+  if (!empresaId) {
+    state.formError = 'Empresa não identificada.';
+    render();
+    return;
+  }
+
+  const produto = {
+    barcode,
+    name,
+    price,
+    stock: isNaN(stock) ? 0 : stock,
+    category,
+    empresa_id: empresaId
+  };
+
+  try {
+    if (state.editingProductId) {
+
+      const { data, error } = await supabaseClient
+        .from('produtos')
+        .update(produto)
+        .eq('id', state.editingProductId)
+        .eq('empresa_id', empresaId)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      state.products = state.products.map((p) =>
+        String(p.id) === String(state.editingProductId) ? data : p
+      );
+
+    } else {
+
+      const { data, error } = await supabaseClient
+        .from('produtos')
+        .insert([produto])
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      state.products.push(data);
+    }
+
+    resetProductForm();
+
+  } catch (error) {
+    console.error('Erro ao salvar produto:', error);
+    state.formError = 'Erro ao salvar produto no Supabase: ' + error.message;
+    render();
+  }
 }
+
 function resetProductForm() { state.editingProductId = null; state.formError = ''; render(); }
 function editProduct(id) { state.editingProductId = id; state.formError = ''; render(); focusById('pf-barcode'); }
-function removeProductHandler(id) {
-  saveProducts(state.products.filter((p) => p.id !== id));
-  if (state.editingProductId === id) resetProductForm(); else render();
-}
+async function removeProductHandler(id) {
+  console.log('ID CLICADO:', id);
+console.log('ID DO PRODUTO CARNE:', state.products.find(p => p.name === 'carne')?.id);
+  const { error } = await supabaseClient
+    .from('produtos')
+    .delete()
+    .eq('id', id)
+    .eq('empresa_id', state.currentUser?.empresa_id);
+
+  if (error) {
+    console.error('Erro ao excluir produto:', error);
+    alert('Erro ao excluir produto no Supabase: ' + error.message);
+    return;
+  }
+
+  state.products = state.products.filter((p) => String(p.id) !== String(id));
+
+  state.editingProductId = null;
+  console.log('PRODUTOS DEPOIS DA EXCLUSÃO:', state.products);
+  render();
+  console.log('PRODUTOS DEPOIS DO RENDER:', state.products);
+  }
+
  
 // ---------------------------------------------------------------------------
 // Ações — Configurações
@@ -577,6 +1114,7 @@ function headerHTML() {
     { id: 'produtos', label: 'Produtos', icon: 'package' },
     { id: 'relatorio', label: 'Relatório', icon: 'chart' },
     { id: 'situacao', label: 'Situação do caixa', icon: 'chart' },
+    { id: 'fechamentos', label: 'Fechamentos', icon: 'lock' },
     { id: 'config', label: 'Configurações', icon: 'settings' },
   ];
   const caixaTabs = [
@@ -902,7 +1440,7 @@ function fieldHTML({ id, label, value = '', placeholder = '', mono = false, type
 }
  
 function produtosHTML() {
-  const editing = state.editingProductId ? state.products.find(p => p.id === state.editingProductId) : null;
+  const editing = state.editingProductId ? state.products.find(p => String(p.id) === String(state.editingProductId)) : null;
   const search = state.produtosSearch;
   const filtered = state.products.filter(p => p.name.toLowerCase().includes(search.toLowerCase()) || p.barcode.includes(search));
   const lowStock = state.products.filter(p => p.stock <= 5);
@@ -1038,6 +1576,58 @@ function relatorioHTML() {
   </div>`;
 }
  
+function fechamentosHTML() {
+  const empresaId = state.currentUser?.empresa_id;
+  const closures = state.cashClosures.filter(c =>
+    !empresaId || String(c.empresa_id) === String(empresaId)
+  );
+
+  const caixas = [...new Set(closures.map(c => c.caixa_id).filter(Boolean))];
+  const selectedCaixa = state.fechamentosCaixaFilter || 'todos';
+  const filtered = selectedCaixa === 'todos'
+    ? closures
+    : closures.filter(c => String(c.caixa_id) === String(selectedCaixa));
+
+  return `
+  <div class="stack">
+    <div class="card">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+        <div>
+          <h2 style="font-size:15px;font-weight:700;margin:0 0 4px;">Histórico de fechamentos</h2>
+          <p style="font-size:12px;color:var(--ink-soft);margin:0;">Mostrando somente os fechamentos da empresa atualmente logada.</p>
+        </div>
+        <div class="input-wrap" style="padding:7px 10px;min-width:220px;">
+          <span style="font-size:12px;color:var(--ink-soft);white-space:nowrap;">Caixa:</span>
+          <select id="fechamentos-caixa-filter" style="width:100%;background:transparent;border:none;outline:none;font-size:12px;">
+            <option value="todos" ${selectedCaixa === 'todos' ? 'selected' : ''}>Todos os caixas</option>
+            ${caixas.map(id => `<option value="${escapeHtml(id)}" ${String(selectedCaixa) === String(id) ? 'selected' : ''}>${escapeHtml(String(id).slice(0, 8))}…</option>`).join('')}
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+        <p style="font-size:11px;font-weight:600;text-transform:uppercase;color:var(--ink-soft);margin:0;">Fechamentos registrados</p>
+        <span style="font-size:12px;color:var(--ink-soft);">${filtered.length} registro(s)</span>
+      </div>
+      ${filtered.length === 0 ? `<p class="empty">Nenhum fechamento registrado para esta empresa${selectedCaixa !== 'todos' ? ' neste caixa' : ''}.</p>` : filtered.map(c => `
+        <div class="sale-row" style="align-items:flex-start;">
+          <div style="min-width:0;">
+            <div style="font-size:13px;font-weight:600;">${new Date(c.datetime).toLocaleString('pt-BR')}</div>
+            <div style="font-size:11.5px;color:var(--ink-soft);margin-top:3px;">Caixa: <span class="mono">${escapeHtml(String(c.caixa_id || 'não informado'))}</span></div>
+            <div style="font-size:11.5px;color:var(--ink-soft);">Operador: ${escapeHtml(c.operator || 'não informado')} · ${c.salesCount || 0} venda(s)</div>
+          </div>
+          <div style="text-align:right;flex-shrink:0;">
+            <div class="mono" style="font-size:14px;font-weight:700;">${brl(c.totalGeral)}</div>
+            <div style="font-size:11px;color:var(--ink-soft);margin-top:3px;">Dinheiro ${brl(c.totalDinheiro)} · Cartão ${brl(c.totalCartao)} · Pix ${brl(c.totalPix)}</div>
+            <div style="font-size:11px;margin-top:3px;color:${Number(c.difference) === 0 ? 'var(--primary-dark)' : (Number(c.difference) > 0 ? 'var(--gold)' : 'var(--danger)')};">Diferença: ${brl(c.difference)}</div>
+          </div>
+        </div>`).join('')}
+    </div>
+  </div>`;
+}
+
 function configHTML() {
   const cfg = state.pixConfig;
   const editingUser = state.editingUserId ? state.users.find(u => u.id === state.editingUserId) : null;
@@ -1117,6 +1707,7 @@ function buildHTML() {
     if (state.tab === 'produtos') mainContent = produtosHTML();
     else if (state.tab === 'relatorio') mainContent = relatorioHTML();
     else if (state.tab === 'situacao') mainContent = caixaSituacaoHTML();
+    else if (state.tab === 'fechamentos') mainContent = fechamentosHTML();
     else if (state.tab === 'config') mainContent = configHTML();
   }
   return `${headerHTML()}<main>${mainContent}</main>`;
@@ -1142,7 +1733,7 @@ const ENTER_ACTIONS = {
   submitUserForm: () => submitUserForm(),
 };
  
-root.addEventListener('click', (e) => {
+root.addEventListener('click', async (e) => {
   const t = e.target.closest('[data-action]');
   if (!t) return;
   const action = t.dataset.action;
@@ -1163,7 +1754,7 @@ root.addEventListener('click', (e) => {
   else if (action === 'finalize-sale') finalizeSale();
   else if (action === 'copy-pix') copyPixCode();
   else if (action === 'edit-product') editProduct(t.dataset.id);
-  else if (action === 'remove-product') removeProductHandler(t.dataset.id);
+  else if (action === 'remove-product') {await removeProductHandler(t.dataset.id);}
   else if (action === 'reset-product-form') resetProductForm();
   else if (action === 'submit-product-form') submitProductForm();
   else if (action === 'save-pix-config') savePixConfigHandler();
@@ -1173,7 +1764,30 @@ root.addEventListener('click', (e) => {
   else if (action === 'submit-user-form') submitUserForm();
   else if (action === 'submit-withdrawal') submitWithdrawal();
   else if (action === 'submit-cash-closure') submitCashClosure();
-  else if (action === 'conclude-closure') { state.lastClosureResult = null; state.caixaTab = 'venda'; render(); }
+  else if (action === 'conclude-closure') {
+  state.lastClosureResult = null;
+
+  const { data, error } = await supabaseClient
+    .from('caixas')
+    .insert([{
+      empresa_id: state.currentUser?.empresa_id,
+      operator: state.currentUser?.name || null,
+      status: 'aberto',
+      opening_cash: 0
+    }])
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Erro ao abrir novo caixa:', error);
+    alert('Erro ao abrir novo caixa no Supabase: ' + error.message);
+    return;
+  }
+
+  state.currentCaixaId = data.id;
+  state.caixaTab = 'venda';
+  render();
+}
   else if (action === 'print-page') window.print();
 });
  
@@ -1191,6 +1805,7 @@ root.addEventListener('input', (e) => {
   else if (id === 'catalog-search') { state.catalogSearch = e.target.value; render(); }
   else if (id === 'produtos-search') { state.produtosSearch = e.target.value; render(); }
   else if (id === 'received-input') { state.receivedStr = e.target.value; render(); }
+  else if (id === 'fechamentos-caixa-filter') { state.fechamentosCaixaFilter = e.target.value; render(); }
 });
  
 root.addEventListener('blur', (e) => {
@@ -1202,8 +1817,11 @@ root.addEventListener('blur', (e) => {
   }
 }, true);
  
-// ---------------------------------------------------------------------------
-loadData();
+// ----------------------------------supabase--------------------------------
+loadData().then(() => {
+  console.log('VENDAS CARREGADAS:', state.sales);
+});
+// atualização em tempo real do Supabase2
 </script>
 </body>
 </html>
